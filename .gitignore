@@ -9,6 +9,23 @@ venv/
 .ipynb_checkpoints/
 *.egg-info/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.tsbuildinfo
+
+# Generated pipeline artifacts (regenerated from sources; never commit)
+intermediate/*
+!intermediate/.gitkeep
+output/*
+!output/.gitkeep
+semantic-match/*
+!semantic-match/.gitkeep
+!semantic-match/prompt.md
+!semantic-match/RUN.md
+research/*
+!research/.gitkeep
+!research/RUN_RENAME.md
 
 # Env / secrets
 .env

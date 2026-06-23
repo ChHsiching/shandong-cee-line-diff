@@ -1,0 +1,111 @@
+{
+  "_doc": "Golden pairs for Stage 2 agent semantic-match regression. Each entry is a (大绿本专业, expected matched 近三年专业) pair that a human pre-confirmed as the correct unique semantic correspondence. After agent dispatch (harness side; see semantic-match/RUN.md), the main session asserts >=80% of these are recovered. This file is NOT consumed by CI (test_golden_pair_hit_rate is @pytest.mark.manual and skips). Pairs span the six-要素 identity dimensions: core-name detail drift, gender bracket, cooperation track, campus, direction, 招生类别. Real pair values are filled in during the main session once the agent run produces batch_*_result.jsonl; the schema below is the contract.",
+  "threshold_hit_rate": 0.80,
+  "pairs": [
+    {
+      "school": "中国人民大学",
+      "school_cat": "",
+      "dagluben_major": "经济学类(经济学、国民经济管理、能源经济)",
+      "expected_match": "经济学类",
+      "dimension": "core-name + 子专业清单 展开"
+    },
+    {
+      "school": "北京航空航天大学",
+      "school_cat": "",
+      "dagluben_major": "数学与应用数学(拔尖学生培养计划)(含物理学)",
+      "expected_match": "数学与应用数学(拔尖学生培养计划)",
+      "dimension": "方向括号对齐 + 含子句"
+    },
+    {
+      "school": "北京理工大学",
+      "school_cat": "",
+      "dagluben_major": "计算机科学与技术(全英文教学)",
+      "expected_match": "计算机科学与技术",
+      "dimension": "培养语言括号(非差异化身份)"
+    },
+    {
+      "school": "山东大学",
+      "school_cat": "",
+      "dagluben_major": "临床医学(5+3一体化)(儿科学方向)",
+      "expected_match": "临床医学(5+3一体化)",
+      "dimension": "学制 + 方向双层括号"
+    },
+    {
+      "school": "中国海洋大学",
+      "school_cat": "",
+      "dagluben_major": "法学(中外合作办学)",
+      "expected_match": "法学",
+      "dimension": "招生类别(合作) 校内同核心名消歧"
+    },
+    {
+      "school": "青岛大学",
+      "school_cat": "地方专项计划",
+      "dagluben_major": "汉语言文学",
+      "expected_match": "汉语言文学",
+      "dimension": "招生类别差异化(地方专项 vs 普通)"
+    },
+    {
+      "school": "烟台大学",
+      "school_cat": "",
+      "dagluben_major": "土木工程(中外合作办学)(与意大利都灵理工大学合作)",
+      "expected_match": "土木工程(中外合作办学)",
+      "dimension": "合作括号 + 国际交流长文"
+    },
+    {
+      "school": "济南大学",
+      "school_cat": "",
+      "dagluben_major": "电子信息类(通信工程、人工智能、电子信息工程)",
+      "expected_match": "电子信息类",
+      "dimension": "类 + 子专业清单"
+    },
+    {
+      "school": "曲阜师范大学",
+      "school_cat": "",
+      "dagluben_major": "数学与应用数学(师范,公费师范生)",
+      "expected_match": "数学与应用数学(师范)",
+      "dimension": "师范方向 + 公费类别"
+    },
+    {
+      "school": "山东师范大学",
+      "school_cat": "",
+      "dagluben_major": "心理学(师范类)",
+      "expected_match": "心理学",
+      "dimension": "师范方向(近三年无后缀,核心名唯一)"
+    },
+    {
+      "school": "山东科技大学",
+      "school_cat": "",
+      "dagluben_major": "机械设计制造及其自动化(中外合作办学)",
+      "expected_match": "机械设计制造及其自动化",
+      "dimension": "合作括号消歧"
+    },
+    {
+      "school": "中国石油大学(华东)",
+      "school_cat": "",
+      "dagluben_major": "资源勘查工程(创新计划)(含油气)",
+      "expected_match": "资源勘查工程",
+      "dimension": "方向括号 + 含子句"
+    },
+    {
+      "school": "山东农业大学",
+      "school_cat": "",
+      "dagluben_major": "植物保护(植物医学方向)",
+      "expected_match": "植物保护",
+      "dimension": "方向括号"
+    },
+    {
+      "school": "青岛科技大学",
+      "school_cat": "",
+      "dagluben_major": "化学工程与工艺(精英班)",
+      "expected_match": "化学工程与工艺",
+      "dimension": "培养模式括号"
+    },
+    {
+      "school": "山东理工大学",
+      "school_cat": "",
+      "dagluben_major": "车辆工程(新能源汽车方向)",
+      "expected_match": "车辆工程",
+      "dimension": "方向括号"
+    }
+  ]
+}
