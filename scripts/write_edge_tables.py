@@ -6,7 +6,6 @@ write_outputs module.
 
 Slice 5 implements the新增 (new-major) surface:
     - identify_new_majors(unmatched, history) -> list[DaglubenRow]
-    - mark_newmajor_in_main(dagluben_rows, estimates) -> list[dict]
     - write_new_major_table(new_majors_with_estimate, out_path) -> None
 
 Slice 6 (this file, lower half) implements the remaining edge tables (spec §7):
@@ -15,7 +14,11 @@ Slice 6 (this file, lower half) implements the remaining edge tables (spec §7):
     - 新增校表.xlsx          (Task 6.2 — 未配对的大绿本独有校)
     - 停招消失校表.xlsx      (Task 6.2 — 未配对的历史独有校)
     - 特殊情况.xlsx          (Task 6.1 — 飞行不成/剩余无法匹配)
-    - mark_rename_in_main()  (Task 6.2 — 改名校专业 J/T 留空+日志)
+
+iteration-2 Slice D (issue #13) removed two dead functions:
+``mark_newmajor_in_main`` and ``mark_rename_in_main`` were never called by
+run_pipeline (the main-table J/T/log are filled directly in
+``_build_main_results``); keeping them around invited stale-API confusion.
 """
 
 from __future__ import annotations
@@ -25,13 +28,10 @@ from typing import Any, Sequence
 
 import openpyxl
 
-from scripts.constants import LOG_RENAME_PENDING
-from scripts.models import DaglubenRow, EstimateResult, HistoryRow, RenameRow
+from scripts.models import DaglubenRow, HistoryRow, RenameRow
 
 __all__ = [
     "identify_new_majors",
-    "mark_newmajor_in_main",
-    "mark_rename_in_main",
     "write_new_major_table",
     "write_deleted_major_table",
     "write_rename_table",
@@ -88,34 +88,6 @@ def identify_new_majors(
         if d.get("core", "") in cores:
             continue  # 同校已有同 core 名 → 不是真新增
         out.append(d)
-    return out
-
-
-def mark_newmajor_in_main(
-    dagluben_rows: list[DaglubenRow],
-    estimates: dict[int, EstimateResult],
-) -> list[dict[str, Any]]:
-    """Attach new-major estimate to main-output rows.
-
-    Each大绿本 row becomes a main-output record carrying the original fields
-    plus, when an estimate exists for its ``src_row_idx``:
-        - ``J`` = estimate value (may be None for level 2)
-        - ``log`` = estimate log (transparent口径)
-        - ``is_new_major`` = True
-
-    Rows without an estimate pass through with ``is_new_major`` absent so
-    downstream writers can distinguish them.
-    """
-    out: list[dict[str, Any]] = []
-    for d in dagluben_rows:
-        idx = d.get("src_row_idx", 0)
-        est = estimates.get(idx)
-        record: dict[str, Any] = dict(d)
-        if est is not None:
-            record["J"] = est.get("value")
-            record["log"] = est.get("log", "")
-            record["is_new_major"] = True
-        out.append(record)
     return out
 
 
@@ -340,33 +312,3 @@ def write_special_table(
         for r in special_rows
     ]
     _write_simple_table(_SPECIAL_HEADER, rows, out_path, "特殊情况")
-
-
-# --- 改名校专业主产出标记 ---------------------------------------------------
-
-def mark_rename_in_main(
-    dagluben_rows: Sequence[DaglubenRow],
-    renamed_dgl_schools: set[str],
-) -> list[dict[str, Any]]:
-    """Mark renamed-school majors in the main output: J/T left empty + log.
-
-    Per spec §6 Stage 3 改名 + §9 改名 log: renamed schools' majors are NOT
-    re-matched across the rename (no automatic cross-rename pairing). Their
-    J/T stay ``None`` and the log reads ``疑似改名校(见改名表)，待人工核验``
-    so a human can manually link them after reviewing the rename table +
-    web-search备注.
-
-    Each大绿本 row becomes a main-output record (dict copy); rows whose
-    ``school`` ∈ ``renamed_dgl_schools`` get ``J=None``, ``T=None``,
-    ``log=LOG_RENAME_PENDING``, ``is_rename_pending=True``.
-    """
-    out: list[dict[str, Any]] = []
-    for d in dagluben_rows:
-        record: dict[str, Any] = dict(d)
-        if d.get("school", "") in renamed_dgl_schools:
-            record["J"] = None
-            record["T"] = None
-            record["log"] = LOG_RENAME_PENDING
-            record["is_rename_pending"] = True
-        out.append(record)
-    return out

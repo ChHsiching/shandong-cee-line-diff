@@ -1,10 +1,12 @@
 """Pure-function TDD for Slice 5 Task 5.2 — new-major edge-table writers.
 
-Covers the three functions added to scripts/write_edge_tables.py in Slice 5
-(其余函数仍 NotImplementedError 归 Slice 6):
+Covers the functions in scripts/write_edge_tables.py:
     identify_new_majors(unmatched, history) -> list[DaglubenRow]
-    mark_newmajor_in_main(dagluben_rows, estimates) -> list[MatchResult-like]
     write_new_major_table(new_majors_with_estimate, out_path) -> None
+
+``mark_newmajor_in_main`` was removed in iteration-2 Slice D (issue #13) as
+dead code — run_pipeline's ``_build_main_results`` reads the estimate dict
+directly, the marker was never on the call path.
 
 Small-sample RED cases only; the real-data smoke count is reported in
 scripts/run_newmajor_smoke.py and does NOT participate in the RED contract.
@@ -16,10 +18,9 @@ from pathlib import Path
 
 import openpyxl
 
-from scripts.models import DaglubenRow, EstimateResult, HistoryRow
+from scripts.models import DaglubenRow, HistoryRow
 from scripts.write_edge_tables import (
     identify_new_majors,
-    mark_newmajor_in_main,
     write_new_major_table,
 )
 
@@ -75,50 +76,6 @@ def test_identify_new_majors_school_scoped_not_global() -> None:
 
 def test_identify_new_majors_empty_unmatched_returns_empty() -> None:
     assert identify_new_majors([], [HistoryRow(school="x", core="y")]) == []
-
-
-# ---------------------------------------------------------------------------
-# mark_newmajor_in_main
-# ---------------------------------------------------------------------------
-
-
-def test_mark_newmajor_in_main_fills_j_and_adds_log_and_marker() -> None:
-    dagluben_rows = [
-        DaglubenRow(school="示例大学", core="人工智能", major="人工智能",
-                    src_row_idx=5),
-        DaglubenRow(school="示例大学", core="计算机", major="计算机",
-                    src_row_idx=6),
-    ]
-    estimates: dict[int, EstimateResult] = {
-        5: EstimateResult(
-            value=80.0, level=0, n=2,
-            log="新增专业：估算=同校同选科(2)均值=80.0",
-        ),
-    }
-    marked = mark_newmajor_in_main(dagluben_rows, estimates)
-    by_idx = {r["src_row_idx"]: r for r in marked}
-
-    # 新增行：J 填估算值，log 用 EstimateResult.log，且带新增标记。
-    assert by_idx[5]["J"] == 80.0
-    assert by_idx[5]["log"] == "新增专业：估算=同校同选科(2)均值=80.0"
-    assert by_idx[5].get("is_new_major") is True
-
-    # 非新增行：未被 estimates 覆盖；保持原样，不带新增标记。
-    assert by_idx[6].get("is_new_major") is not True
-
-
-def test_mark_newmajor_in_main_level2_keeps_j_empty() -> None:
-    dagluben_rows = [
-        DaglubenRow(school="全新大学", core="人工智能", major="人工智能",
-                    src_row_idx=9),
-    ]
-    estimates: dict[int, EstimateResult] = {
-        9: EstimateResult(value=None, level=2, n=0, log="新校/无历史，无法估算"),
-    }
-    marked = mark_newmajor_in_main(dagluben_rows, estimates)
-    assert marked[0]["J"] is None
-    assert marked[0]["log"] == "新校/无历史，无法估算"
-    assert marked[0].get("is_new_major") is True
 
 
 # ---------------------------------------------------------------------------

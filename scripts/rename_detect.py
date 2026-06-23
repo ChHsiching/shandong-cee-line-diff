@@ -25,8 +25,9 @@ Three pure stages:
      to exclude renamed schools' historical majors).
 
 Renamed-school majors: the main-output writer leaves their J/T empty with log
-``疑似改名校(见改名表)，待人工核验`` (spec §9 改名). That step lives in
-:func:`scripts.write_edge_tables.mark_rename_in_main` (Slice 6 Task 6.2).
+``疑似改名校(见改名表)，待人工核验`` (spec §9 改名). That step lives inline in
+:func:`scripts.run_pipeline._build_main_results` (iteration-2 Slice D removed
+the unused standalone marker).
 """
 
 from __future__ import annotations

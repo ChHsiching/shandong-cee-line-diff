@@ -1,8 +1,9 @@
-"""TDD tests for Slice 6 Task 6.1/6.2 — boundary table writers + rename marker.
+"""TDD tests for Slice 6 Task 6.1/6.2 — boundary table writers.
 
-Covers the five writers that replace the Slice 5 NotImplementedError stubs
-in scripts/write_edge_tables.py plus mark_rename_in_main (改名校专业 J/T
-留空+日志, spec §6 Stage 3 改名 / §9 改名 log).
+Covers the five writers in scripts/write_edge_tables.py. The main-output
+rename marker (``mark_rename_in_main``) was removed in iteration-2 Slice D
+(issue #13) as dead code — run_pipeline fills J/T/log directly in
+``_build_main_results``, so the marker was never on the call path.
 
 Small-sample RED cases; the real-data counts are a smoke output
 (scripts/run_rename_smoke.py).
@@ -14,10 +15,7 @@ from pathlib import Path
 
 import openpyxl
 
-from scripts.constants import LOG_RENAME_PENDING
-from scripts.models import DaglubenRow
 from scripts.write_edge_tables import (
-    mark_rename_in_main,
     write_deleted_major_table,
     write_gone_school_table,
     write_new_school_table,
@@ -151,37 +149,3 @@ def test_write_special_table(tmp_path: Path) -> None:
     write_special_table(rows, out)
     data = _load(out)
     assert "飞行" in data[1][7]
-
-
-# ---------------------------------------------------------------------------
-# mark_rename_in_main
-# ---------------------------------------------------------------------------
-
-
-def test_mark_rename_in_main_empties_j_t_and_sets_log() -> None:
-    dagluben = [
-        DaglubenRow(school="新大学", major="计算机", J=70.0, T=1.0,
-                    src_row_idx=1),
-        DaglubenRow(school="共有大学", major="数学", J=80.0, T=2.0,
-                    src_row_idx=2),
-    ]
-    renamed = {"新大学"}
-    marked = mark_rename_in_main(dagluben, renamed)
-    by_idx = {r["src_row_idx"]: r for r in marked}
-
-    # 改名校专业: J/T 置空, 日志为「疑似改名校…」, 带 is_rename_pending 标记.
-    assert by_idx[1]["J"] is None
-    assert by_idx[1]["T"] is None
-    assert by_idx[1]["log"] == LOG_RENAME_PENDING
-    assert by_idx[1].get("is_rename_pending") is True
-
-    # 非改名校专业: 保持原样, 无改名标记.
-    assert by_idx[2]["J"] == 80.0
-    assert by_idx[2].get("is_rename_pending") is not True
-
-
-def test_mark_rename_in_main_empty_renamed_keeps_all() -> None:
-    dagluben = [DaglubenRow(school="甲", major="x", J=70.0, src_row_idx=1)]
-    marked = mark_rename_in_main(dagluben, set())
-    assert marked[0].get("is_rename_pending") is not True
-    assert marked[0]["J"] == 70.0

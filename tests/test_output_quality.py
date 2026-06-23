@@ -140,3 +140,83 @@ def test_write_special_table_maps_fields_to_columns(tmp_path: Path) -> None:
     assert data[1][1] == "飞大"
     assert data[1][3] == "飞行技术"
     assert data[1][7] == "飞行技术(军队)，提前批池匹配不成"
+
+
+# ---------------------------------------------------------------------------
+# Slice D (issue #13) — field-mapping regression lock for ALL active writers.
+# Each writer is asserted with **real field names** (the names the producing
+# code actually passes in) so a field→header remap breakage fails loudly.
+# Mirrors the陷阱 A that bit write_rename_table / write_special_table /
+# write_deleted_major_table earlier.
+# ---------------------------------------------------------------------------
+
+
+def test_write_rename_table_maps_fields_to_columns(tmp_path: Path) -> None:
+    """RenameRow fields (new_school/old_school/confidence/major_count_2026/
+    remark/manual_reviewed) must reach the header columns, not vanish."""
+    from scripts.write_edge_tables import write_rename_table
+
+    rows = [{
+        "new_school": "新大学", "old_school": "旧大学", "confidence": 0.88,
+        "major_count_2026": 12, "remark": "网查：2026 由旧大学更名",
+        "manual_reviewed": True,
+    }]
+    out = tmp_path / "改名.xlsx"
+    write_rename_table(rows, out)
+    data = _load_xlsx(out)
+    # header order: 2026新校名 / 候选旧校名 / 置信度 / 2026本科专业数 / 备注 / 人工已核验
+    assert data[1][0] == "新大学"
+    assert data[1][1] == "旧大学"
+    assert data[1][2] == 0.88
+    assert data[1][3] == 12
+    assert data[1][4] == "网查：2026 由旧大学更名"
+    assert data[1][5] is True
+
+
+def test_write_new_school_table_maps_fields_to_columns(tmp_path: Path) -> None:
+    """新增校表 records (new_school/major_count_2026) must populate cells."""
+    from scripts.write_edge_tables import write_new_school_table
+
+    rows = [{"new_school": "全新大学", "major_count_2026": 7}]
+    out = tmp_path / "新增校.xlsx"
+    write_new_school_table(rows, out)
+    data = _load_xlsx(out)
+    assert data[1][0] == "全新大学"
+    assert data[1][1] == 7
+    assert "新增校" in data[1][2]
+
+
+def test_write_gone_school_table_maps_fields_to_columns(tmp_path: Path) -> None:
+    """停招消失校表 records (old_school) must populate cells (not blank)."""
+    from scripts.write_edge_tables import write_gone_school_table
+
+    rows = [{"old_school": "消失大学"}]
+    out = tmp_path / "停招.xlsx"
+    write_gone_school_table(rows, out)
+    data = _load_xlsx(out)
+    assert data[1][0] == "消失大学"
+    assert "未在 2026 招生" in data[1][1]
+
+
+def test_write_new_major_table_maps_fields_to_columns(tmp_path: Path) -> None:
+    """新增专业 table: record keys (school/major/subject/value/T/level/n/log)
+    must reach the header columns — both J and T columns round-trip (V5-1)."""
+    from scripts.write_edge_tables import write_new_major_table
+
+    rows = [{
+        "school": "新大学", "major": "人工智能", "subject": "物理和化学",
+        "value": 88.5, "T": 6.25, "level": 0, "n": 3,
+        "log": "新增专业：估算=同校同选科(3)均值=88.5",
+    }]
+    out = tmp_path / "新增专业.xlsx"
+    write_new_major_table(rows, out)
+    data = _load_xlsx(out)
+    # header: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 退化级别 / 样本量 / 日志
+    assert data[1][0] == "新大学"
+    assert data[1][1] == "人工智能"
+    assert data[1][2] == "物理和化学"
+    assert data[1][3] == 88.5
+    assert data[1][4] == 6.25
+    assert data[1][5] == 0
+    assert data[1][6] == 3
+    assert "新增专业" in data[1][7]
