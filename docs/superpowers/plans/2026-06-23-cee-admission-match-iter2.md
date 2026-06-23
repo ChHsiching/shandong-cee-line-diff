@@ -9,6 +9,33 @@
 
 **Tech Stack:** Python 3.14 + `.venv`（pytest 9.1.1 + openpyxl 3.1.5 + ruff）；agent 经 Agent 工具并行（复核）。
 
+## Plan v2 修订（code-architect + tdd-guide 把关后，**绑定**，覆盖前文冲突处）
+
+**verify_command** = `.venv/bin/python -m pytest`（默认 `-m "not manual"`；`@pytest.mark.manual` 不计 CI 覆盖，须配人工核验）。
+
+### Slice A 修订
+- A1 Files **加** `scripts/run_pipeline.py`（`_build_main_results` 新增分支 `T=est.get("T")`，勿硬编码 None）+ `scripts/write_edge_tables.py`（`新增专业.xlsx` header 加「线差标准差估算」列 + remap T）。`EstimateResult` 加 `T` 字段。
+- A2 单年 T 日志锚点 = **三处 stage 文件**（`stage1_strict` / `stage1_5_coarse` / `stage2_apply`），**非** `_build_main_results`。抽 `_single_year_note(hist) -> str` 工具复用（`hist.T is None` → "（单年数据，无标准差）"）。RED 用针对性 `T=None` 历史 fixture（非合成 e2e fixture）。
+- A1 RED 锁定 **T 也 round 2**（V5-6）。
+
+### Slice B 修订（核心）
+- **apply_verify 签名** = `(result_jsonl_paths, dagluben, matches) -> VerifyApplyResult{confirmed: list[MatchResult], demoted: list[EdgeRow], verdict_by_idx: dict[int,str]}`（需 dagluben 才能造 EdgeRow）。
+- **VerifyBatch / VerifyBatchItem**（不复用 `stage2_agent.Batch`，避免混淆）；`write_verify_prompts` 独立命名。
+- **VerifyResult** = `{src_row_idx: int, verdict: "确定"|"存疑", reason: str}`（不改 J/T，只改去留）。
+- **demote 通路（B3 关键）**：run_pipeline 在 `_build_main_results` **之前**用 `verdict_by_idx` 过滤 `coarse_results`/`semantic_results`（剔除存疑 idx）；同步从 `classified_idx` 移除这些 idx → 自然落 `remaining_unmatched → flight_and_special`；给 `flight_and_special` 加 `demoted_map: dict[int,str]` 注入「复核存疑：<原因>」（绕过 `LOG_SPECIAL_UNMATCHED` 兜底覆盖）。
+- **B2 拆**：(i) CI 契约测试（`apply_verify` 路由正确——给定 verdict jsonl，确定/存疑各入对桶）；(ii) `@pytest.mark.manual` 黄金回归（agent 派发后断言命中率，镜像 `test_stage2_contract.py:369` + `semantic_pairs.json`）；明示阈值（如 ≥95% 判确定）+ 采样量。
+
+### Slice C 修订
+- **audit 签名** = `audit(output_dir, *, data_dir, intermediate_dir, history=None)`（能读/重算 history）。
+- **AuditReport** = `{ok: bool, checks: list[{name, passed, detail}]}`；`main()` exit code 用 `pytest.raises(SystemExit)` 测。
+- **检查①改为「复核覆盖完备性」**（程序可验）：主表非严格匹配行的 src_row_idx 必须出现在 `verify_*_result.jsonl` 且 verdict=确定；jsonl 缺失 → audit fail 提示「复核未派发」。语义抽样 → 单独 `audit_sample.xlsx`（`@manual`，不计 exit 0）。
+- **检查⑤精度区分**：matched 行比源值、新增估算行比 `round(mean,2)`（容差）；勿一刀切 `==`。
+
+### Slice D 修订
+- D1 先删 dead code `mark_newmajor_in_main`/`mark_rename_in_main`（run_pipeline 未调用）+ 字段映射回归补齐所有**活跃** writer。
+- D2 重跑真实源 → 标 `@pytest.mark.manual`（三源字节不改 + 合成 fixture 先例）。
+- D3 skill dry-run 为 manual（文档不可单元测）。
+
 ## Global Constraints（spec v5）
 
 - 主表零错配（V5-0）：仅严格精确构造确定；判断型（coarse 全部 + agent）须二次复核，存疑→特殊表。
