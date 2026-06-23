@@ -9,6 +9,29 @@
 
 **Tech Stack:** Python 3.14 + `.venv`（pytest 9.1.1 + openpyxl 3.1.5 + ruff）。
 
+## Plan v2 修订（code-architect + tdd-guide 把关后，**绑定**）
+
+**verify_command** = `.venv/bin/python -m pytest`。
+
+### Task 1 修订（split_log）
+- **先抽样真实日志前缀**：用 openpyxl 扫扁平版「匹配日志」列前缀全集，补齐 split_log 分支表，防遗漏。
+- 补**边界**：空串/未知前缀 → 阶段=""、备注=原文（不抛错，保守留原文）；**反向样例**（严格匹配无单年标记 → 单年数据=空；粗筛无漂移 → 选科漂移=空）。
+- **复核存疑**：阶段=`复核存疑`（主表实际无此日志——已移特殊表；但函数须能处理，若收到则阶段=复核存疑、备注=原因）。
+
+### Task 2 修订（write_outputs）
+- **显式 7 个 HEADER 常量 + COL_***：`HEADER_J/HEADER_T/HEADER_STAGE/HEADER_SINGLE_YEAR/HEADER_DRIFT/HEADER_VERIFIED/HEADER_NOTE` + 对应 `COL_*`（13-19）。行尾 7 列 = `[res.J, res.T] + list(split_log(res.log).values())`，顺序固定。
+- HEADER 行也须 19 列（尾部 7 个表头名正确）—— RED 一条断言。
+- 分层版 + 扁平版**各跑一遍** 19 列/5列值断言。
+- 专科行：**分层版**匹配阶段=`专科（超范围）`（split_log 解析 LOG_ZHUANKE）；**扁平版**继续剔除专科（不变）。
+
+### Task 3 修订（audit，扩范围——CRITICAL）
+- **不只改 check①**：audit 所有读 COL_LOG 的检查（check0 判断型覆盖、check4 J-T 一致）**一并迁移**到读「匹配阶段」列：
+  - check0：`阶段 ∈ {粗筛匹配, 语义匹配}` 判断判断型（替换原前缀判断）。
+  - check①：阶段非空（替换原日志非空）。
+  - check4：按阶段区分 matched(严格/粗筛/语义)/estimate(新增专业)（替换原前缀）。
+- **按列名读**（`匹配阶段`），不按索引（防列序变）。
+- 删除 audit 内嵌的 JUDGMENTAL_LOG_PREFIXES 副本（改用阶段白名单）。
+
 ## Global Constraints
 
 - 5 列：匹配阶段 / 单年数据 / 选科漂移 / 复核结果 / 原因备注（spec §2.1）。
