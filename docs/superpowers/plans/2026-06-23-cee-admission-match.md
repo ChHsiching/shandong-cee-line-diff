@@ -7,7 +7,40 @@
 
 **Architecture:** 只读三段式数据管线——Stage0 预处理合并（脚本）→ Stage1 严格（脚本）→ Stage1.5 核心名粗筛自动接受（脚本）→ Stage2 agent 语义（禁脚本）→ Stage3 边界（新增估算/被删/特殊）→ 学校改名分支（agent+WebSearch）→ 输出 + skill。源文件永不修改（哈希校验）。
 
-**Tech Stack:** Python 3 + openpyxl（已装 3.1.5）；pytest（待装）；agent 经 Agent 工具并行；WebSearch 用于改名网查。
+**Tech Stack:** Python 3.14.2 + `.venv`（实测：pytest 9.1.1 + openpyxl 3.1.5 已装）；agent 经 Agent 工具并行；WebSearch 用于改名网查。
+
+## Plan v2 修订（code-architect + tdd-guide 把关后，**绑定**，覆盖前文冲突处）
+
+**verify_command**：`.venv/bin/python -m pytest`（统一）。agent/WebSearch/skill 相关测试标 `@pytest.mark.manual`，CI 跑 `-m "not manual"`。
+
+**新增/调整文件**（覆盖下文 File Structure）：
+- `scripts/constants.py`：一段线 `{2023:443,2024:444,2025:441}`；列索引（近三年 J=idx9/T=idx19/2023线差 K=idx10/2024线差 L=idx11/2025线差 M=idx12；补充表低分 25=idx10/24=idx14/23=idx18）；批次字符串常量；专科小标题关键词；`FLIGHT_BATCH='3.提前批—飞行技术(军队)'`。
+- `scripts/models.py`：TypedDict 契约 `HistoryRow`/`DaglubenRow`/`MatchResult`/`EstimateResult`。
+- `scripts/write_outputs.py`（主表分层+扁平 J/T/日志回填）与 `scripts/write_edge_tables.py`（边界三表+改名表）**分离**，避免跨 Slice 1/5/6 改同一文件。
+- `scripts/stage2_apply.py`：agent jsonl → 主表回填纯函数（TDD）。
+- `pytest.ini`：`testpaths=tests`、注册 `manual` marker、`addopts=--cov=scripts --cov-fail-under=80 -m "not manual"`。
+- `tests/conftest.py`：rootdir、共享 fixture（`tmp_xlsx` factory、最小分层结构 workbook）。
+- `tests/baseline_hashes.py`：三源 sha256 常量（Task 1.1 `git mv` **后**采集，供 Task 1.7 不变性契约）。
+- `intermediate/` 文件加 slice 前缀（`s1_history_regular.csv`、`s2_unified_history.csv`、`s5_post_stage2_unmatched.json`…），防并行覆盖。
+
+**接口契约补强**（覆盖下文接口契约块）：
+- `split_school` 无类别返回 `("校名","")`；`diff_brackets` 无括号返回 `[]`。
+- `line_diff.compute(low_scores_by_year, provincial_lines)`（重命名防两 dict 传反；`provincial_lines` 取自 constants）。
+- `estimate(new_major_row, school_history) -> EstimateResult{value:float|None, level:0|1|2, log:str, n:int}`（TypedDict 替代裸 tuple）。
+- 各 stage 返回具名类型 `list[MatchResult]`/`list[HistoryRow]`/`list[DaglubenRow]`。
+
+**TDD 纪律（tdd-guide）**：
+- 小样本构造 = **RED 判据**；「行数 N / 命中率 X%」= **smoke 层**（不参与 RED，归 Task 7.1 端到端契约），杜绝「先实现后补测」。
+- Slice 4（agent 语义）/ 6.2（改名检测）/ 6.3（WebSearch）= **不可纯 TDD**：编排/格式化纯函数正常 TDD；匹配/网查用 契约测试 + 黄金样例回归集（Slice 4 预标 10-20 条已知正确配对，命中率 ≥80% 为 regression PASS）+ `@pytest.mark.manual` 抽样人工核验，不阻断 CI。
+
+**依赖顺序修正（code-architect CRITICAL）**：
+- **Slice 6 内部：先 Task 6.2 改名检测 → 后 Task 6.1 边界（被删/飞行/特殊）**。理由：被删判定须先识别改名校，否则改名校历史专业被误塞被删表。
+- Slice 5（新增）→ Slice 6 交接：`intermediate/s5_post_stage2_unmatched.json`（Stage2 仍未归类的大绿本专业清单）。
+- 近三年「可用年份数」= K/L/M（2023/2024/2025线差）非空计数（列已确认存在），常规批与提前批口径统一。
+
+**幂等（code-architect）**：改名网查产物 `research/<school>.md` 带时间戳；改名表备注列加 `manual_reviewed` 布尔——重跑不覆盖已人工编辑备注。
+
+**Python 3.14 烟雾**：Task 1.2 前置 `import openpyxl; openpyxl.load_workbook(data/近三年..., read_only=True)` 确认无 DeprecationWarning。
 
 ## Global Constraints（所有 task 隐含遵守，逐字来自 spec §3/§4）
 
@@ -216,6 +249,8 @@ cee-admission-data/
 ---
 
 ## Slice 6 — 边界 + 学校改名分支（issue #7，blocked by #6）
+
+> **执行顺序（v2 CRITICAL）**：先 **Task 6.2 改名检测** → 再 **Task 6.1 边界**（被删/飞行/特殊）→ Task 6.3 网查。被删判定须先识别改名校，否则改名校历史专业误塞被删表。下文任务编号保留，但按此顺序执行。
 
 **风险**：改名误配（字符串相似度已证不可靠）；网查耗时。
 **需求重述**：被删/飞行/特殊 + 改名检测+改名表+最后网查备注，不自动重匹配。
