@@ -181,6 +181,151 @@ def test_write_history_regular_csv_writes_expected_columns(tmp_path):
     assert records[0]["J"] == "60.0"
 
 
+# --- build_history_early (提前批 supplement, pure function RED) -------------
+
+def _tq_row(row: list) -> list:
+    """Pad a提前批-supplement-shaped row to full 19-col width
+    (idx0..idx18 covers batch..23年录取低分; deeper columns irrelevant)."""
+    width = 19
+    return list(row) + [None] * (width - len(row))
+
+
+def test_build_history_early_keeps_only_benke_a_b_and_drops_zhuanke():
+    rows = [
+        # header
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        # 本科 A — kept
+        _tq_row(
+            ["本科提前批A类", "军事类", "P002", "国防科技大学", "36",
+             "软件工程", "物理和化学", 1, 670, 670, 670, 2, 668, 665, 662, 1, 660, 658, 655]
+        ),
+        # 本科 B — kept (merged into same pool)
+        _tq_row(
+            ["本科提前批B类", "公安政法类", "P010", "中国人民公安大学", "01",
+             "治安学", "历史", 2, 600, 590, 580, None, None, None, None, None, None, None, None]
+        ),
+        # 专科提前批 — dropped
+        _tq_row(
+            ["专科提前批", "其他类", "Z001", "某职业学院", "01",
+             "护理", "不限", 1, 300, 290, 280, None, None, None, None, None, None, None, None]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    assert len(out) == 2
+    assert {r["school"] for r in out} == {"国防科技大学", "中国人民公安大学"}
+
+
+def test_build_history_early_unifies_batch_to_early_label():
+    rows = [
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        _tq_row(
+            ["本科提前批A类", "军事类", "P002", "国防科技大学", "36",
+             "软件工程", "物理和化学", 1, 670, 670, 670, 2, 668, 665, 662, 1, 660, 658, 655]
+        ),
+        _tq_row(
+            ["本科提前批B类", "公安政法类", "P010", "中国人民公安大学", "01",
+             "治安学", "历史", 2, 600, 590, 580, None, None, None, None, None, None, None, None]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    # Both A and B are folded to the unified constants.TQ_BATCH_EARLY label.
+    assert {r["source_table"] for r in out} == {"提前批"}
+
+
+def test_build_history_early_computes_J_T_from_low_scores_minus_one_line():
+    """3-year low scores {524,568,500} → diffs {83,124,57} → mean=88.0,
+    pstdev over 3 samples."""
+    rows = [
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        _tq_row(
+            ["本科提前批A类", "军事类", "P002", "X大学", "01",
+             "数学", "物理和化学",
+             None, None, None, 524,  # 2025 low
+             None, None, None, 568,  # 2024 low
+             None, None, None, 500,  # 2023 low
+            ]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    row = out[0]
+    assert row["J"] == 88.0          # mean(83,124,57)
+    assert row["T"] is not None      # pstdev of 3 samples
+    assert abs(row["T"] - 22.671) < 0.01
+
+
+def test_build_history_early_single_year_J_no_T():
+    rows = [
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        _tq_row(
+            ["本科提前批B类", "公安政法类", "P010", "Y大学", "02",
+             "治安学", "历史",
+             None, None, None, 500,  # only 2025: 500-441 = 59
+             None, None, None, None,
+             None, None, None, None,
+            ]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    assert out[0]["J"] == 59.0
+    assert out[0]["T"] is None
+
+
+def test_build_history_early_no_low_scores_yields_none_J_T():
+    rows = [
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        _tq_row(
+            ["本科提前批A类", "军事类", "P099", "Z大学", "03",
+             "英语", "历史", None, None, None, None, None, None, None, None,
+             None, None, None, None]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    assert out[0]["J"] is None
+    assert out[0]["T"] is None
+
+
+def test_build_history_early_normalises_major_and_strips_ignore_brackets():
+    rows = [
+        _tq_row(
+            ["批次名称", "招生类别", "院校代码", "院校名称", "专业代码", "专业名称",
+             "选科", "25人", "25高", "25均", "25低", "24人", "24高", "24均",
+             "24低", "23人", "23高", "23均", "23低"]
+        ),
+        _tq_row(
+            ["本科提前批A类", "军事类", "P002", "国防科技大学", "36",
+             "软件工程（男，通用标准合格，特殊类型招生控制线，英语）",
+             "物理和化学", None, None, None, 500, None, None, None, None,
+             None, None, None, None]
+        ),
+    ]
+    out = stage0_merge.build_history_early(rows)
+    row = out[0]
+    # gender token preserved inside brackets, ignore keywords stripped
+    assert row["stripped"] == "软件工程(男)"
+    assert row["core"] == "软件工程"
+    assert row["school_cat"] == "军事类"  # category from col B (招生类别)
+
+
 # --- Real-workbook smoke (NOT RED; Plan v2 separates smoke from RED) -------
 
 class TestStage0Smoke:
@@ -211,3 +356,33 @@ class TestStage0Smoke:
             wb.close()
         built = stage0_merge.build_dagluben_regular(rows)
         assert len(built) == 23887
+
+    def test_smoke_history_early_row_count(self, repo_root: Path):
+        """补充表 本科A+B = 1707 (1161 + 546); 专科提前批 193 dropped."""
+        from scripts import io_source
+
+        wb = io_source.load_source(repo_root / "data" / "山东省高考提前批录取数据.xlsx")
+        try:
+            ws = wb[wb.sheetnames[0]]
+            rows = list(ws.iter_rows(values_only=True))
+        finally:
+            wb.close()
+        built = stage0_merge.build_history_early(rows)
+        assert len(built) == 1707
+
+    def test_smoke_unified_history_row_count(self, repo_root: Path):
+        """统一历史表 = 常规批一段 28269 + 提前批 1707 ≈ 29976 (±50 per plan)."""
+        from scripts import io_source
+
+        wb_j3 = io_source.load_source(repo_root / "data" / "近三年学校批次专业线差统计.xlsx")
+        try:
+            rows_j3 = list(wb_j3["统计结果"].iter_rows(values_only=True))
+        finally:
+            wb_j3.close()
+        wb_tq = io_source.load_source(repo_root / "data" / "山东省高考提前批录取数据.xlsx")
+        try:
+            rows_tq = list(wb_tq[wb_tq.sheetnames[0]].iter_rows(values_only=True))
+        finally:
+            wb_tq.close()
+        unified = stage0_merge.build_unified_history(rows_j3, rows_tq)
+        assert 29976 - 50 <= len(unified) <= 29976 + 50
