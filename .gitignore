@@ -25,6 +25,7 @@ semantic-match/*
 !semantic-match/RUN.md
 research/*
 !research/.gitkeep
+!research/RUN_RENAME.md
 
 # Env / secrets
 .env

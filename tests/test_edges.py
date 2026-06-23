@@ -36,14 +36,14 @@ def test_deleted_majors_keeps_history_major_absent_from_2026_dagluben() -> None:
     dgl_present = {"示例大学"}
     deleted = deleted_majors(history, dgl_present, renamed_dgl_schools=set())
 
-    by_major = {d.major: d for d in deleted}
+    by_major = {d["major"]: d for d in deleted}
     # 两个专业都不在 2026（dgl_present 只表示学校在，不代表专业在）→ 均为被删候选。
     # 注意：本函数仅按「该校在 + 专业近三年有」判，是否 2026 缺由调用方用大绿本
     # 专业集合减出；这里用最小样本直接断言全部近三年专业均进入被删池。
     assert "甲专业" in by_major
     assert "乙专业" in by_major
-    assert by_major["甲专业"].school == "示例大学"
-    assert by_major["甲专业"].J == 80.0
+    assert by_major["甲专业"]["school"] == "示例大学"
+    assert by_major["甲专业"]["J"] == 80.0
 
 
 def test_deleted_majors_excludes_schools_absent_from_2026_dagluben() -> None:
@@ -54,9 +54,9 @@ def test_deleted_majors_excludes_schools_absent_from_2026_dagluben() -> None:
     ]
     dgl_present = {"存在大学"}  # 消失大学 不在
     deleted = deleted_majors(history, dgl_present, renamed_dgl_schools=set())
-    schools = {d.school for d in deleted}
+    schools = {d["school"] for d in deleted}
     assert schools == {"存在大学"}
-    assert all(d.school != "消失大学" for d in deleted)
+    assert all(d["school"] != "消失大学" for d in deleted)
 
 
 def test_deleted_majors_excludes_renamed_schools() -> None:
@@ -86,7 +86,7 @@ def test_deleted_majors_distinguishes_school_and_major_scoping() -> None:
     ]
     dgl_present = {"甲大学"}  # 乙大学 不在
     deleted = deleted_majors(history, dgl_present, renamed_dgl_schools=set())
-    assert {d.school for d in deleted} == {"甲大学"}
+    assert {d["school"] for d in deleted} == {"甲大学"}
 
 
 def test_deleted_majors_empty_history_returns_empty() -> None:
@@ -115,18 +115,18 @@ def test_flight_rows_unmatched_become_special() -> None:
     special = flight_and_special(flight_unmatched, other_unmatched)
 
     # 全部进特殊表。
-    schools = {r.school for r in special}
+    schools = {r["school"] for r in special}
     assert "空军航空大学" in schools
     assert "海军航空大学" in schools
     assert "某大学" in schools
     # 飞行行的日志写明「飞行技术(军队)，提前批池匹配不成」。
-    flight_rows = [r for r in special if r.batch == FLIGHT_BATCH]
+    flight_rows = [r for r in special if r["batch"] == FLIGHT_BATCH]
     assert len(flight_rows) == 2
-    assert all("飞行" in r.log for r in flight_rows)
+    assert all("飞行" in r["log"] for r in flight_rows)
     # 其它行日志为「无法匹配：<原因>」。
-    other = [r for r in special if r.school == "某大学"]
+    other = [r for r in special if r["school"] == "某大学"]
     assert len(other) == 1
-    assert "无法匹配" in other[0].log
+    assert "无法匹配" in other[0]["log"]
 
 
 def test_flight_and_special_empty_inputs_returns_empty() -> None:
@@ -142,9 +142,9 @@ def test_flight_and_special_preserves_dagluben_fields() -> None:
     assert len(special) == 1
     row = special[0]
     # EdgeRow 保留原大绿本关键字段以便人工核验。
-    assert row.src_row_idx == 7
-    assert row.major == "飞行技术"
-    assert row.batch == FLIGHT_BATCH
+    assert row["src_row_idx"] == 7
+    assert row["major"] == "飞行技术"
+    assert row["batch"] == FLIGHT_BATCH
 
 
 def test_deletedmajor_is_edgerow_subschema() -> None:

@@ -97,3 +97,9 @@ LOG_SUBJECT_DRIFT = "选科政策漂移，已忽略"
 # Stage 2 agent semantic-match logs (spec §9 语义).
 LOG_SEMANTIC_PREFIX = "语义匹配"
 LOG_SEMANTIC_NULL_PREFIX = "语义匹配：无对应"
+
+# Stage 3 edge logs (spec §9 被删 / 改名 / 停招 / 特殊).
+LOG_DELETED = "近三年有、2026 大绿本无"
+LOG_RENAME_PENDING = "疑似改名校(见改名表)，待人工核验"
+LOG_GONE_SCHOOL = "学校未在 2026 招生"
+LOG_FLIGHT_UNMATCHED = "飞行技术(军队)，提前批池匹配不成"
