@@ -3,6 +3,29 @@
 把 2026 大绿本本科专业（主键）与近三年录取线差（外键）按专业名语义一一对应，
 产出带线差与匹配日志的整理表（分层版 + 扁平版）与边界表，并沉淀可年度复用 skill。
 
+## 安装 / 下载本 skill
+
+本仓库既是数据整理工具，也是 `cee-admission-match` skill 的下载源。
+
+**方式1：clone 仓库（推荐，含代码 + skill + 目录结构）**
+
+```bash
+git clone git@github.com:ChHsiching/cee-admission-data.git
+cd cee-admission-data
+python3 -m venv .venv && .venv/bin/pip install pytest openpyxl ruff pytest-cov
+```
+
+**方式2：仅安装 skill（复制到 ~/.claude/skills/）**
+
+```bash
+git clone git@github.com:ChHsiching/cee-admission-data.git
+cp -r cee-admission-data/skills/cee-admission-match ~/.claude/skills/
+```
+
+**使用**：替换 `data/` 下三个 xlsx 为当年数据 → 在 Claude Code 中调用
+`Skill("cee-admission-match")` → skill 自主启动（识别文件 → AskUserQuestion 问一段线/范围
+→ 跑管线 → 派发 agent → 审计 exit 0 → 产出报告）。
+
 ## 目录结构
 
 ```

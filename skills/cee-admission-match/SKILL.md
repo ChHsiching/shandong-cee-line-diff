@@ -1,7 +1,6 @@
 ---
 name: cee-admission-match
-description: 把山东省高考大绿本本科专业与近三年录取线差按专业名语义一一对应，产出带线差与日志的整理表与边界表。年度复用——每年录取数据发布后用本 skill 重跑（v5：precision-first + 数据质量审计硬门）。
-disable-model-invocation: true
+description: 山东高考 CEE 录取数据整理——大绿本招生计划匹配近三年线差。Use when the user provides 山东/CEE/高考 admission xlsx (大绿本招生计划/近三年线差统计/提前批录取数据) and wants them matched into a unified table with 线差+标准差+结构化日志列. Annual reuse; auto-asks 一段线/scope.
 ---
 
 # 山东省高考录取数据匹配整理（年度复用，v5）
@@ -12,11 +11,43 @@ disable-model-invocation: true
 > `docs/superpowers/plans/2026-06-23-cee-admission-match-iter2.md`（iteration-2）。
 > 本 skill 是年度执行的浓缩；与 spec/plan 冲突时以 spec/plan 为准。
 
-## 何时使用
+## 自主启动流程（收到文件后按此执行）
 
-- 每年山东省高考录取数据发布后，需要把当年大绿本本科专业与近三年录取线差对应起来。
-- 输入：三个 xlsx（大绿本招生计划 / 近三年线差统计 / 提前批录取数据）。
-- 输出：带 J/T + 5 结构化列（匹配阶段/单年数据/选科漂移/复核结果/原因备注）的分层版 + 扁平版主表，以及新增/被删/特殊/改名/新增校/停招校边界表。
+> 收到山东省高考数据 xlsx（或提及 大绿本/近三年线差/提前批录取/CEE）时，按以下 7 步自主执行。每步有完成判据；不确定的用 **AskUserQuestion** 问，**不静默停**。
+
+### Step 1：识别三源 + 验证列布局
+- 读 `data/`（或用户指定路径）下 xlsx，按内容识别：**大绿本**（含「批次/学校代码/代号/名称」）、**近三年线差统计**（含「batch/schoolcode/统计线差」）、**提前批录取数据**（含「批次名称/录取低分」）。
+- **验证列布局**：读各表 header，确认列索引与 `constants.py`（J3_STAT_LINE_DIFF=9 / TQ_LOW_2025=10 等）一致。若列变 → 更新 constants + 告知用户。
+- **完成判据**：三源识别完毕 + 列布局匹配 constants（或已更新 constants 并验证）。
+
+### Step 2：问必要参数（AskUserQuestion，不静默停）
+- **一段线**：数据覆盖哪些年份？各年山东一段线值？（不能从数据推断时**必须问**）。
+- **范围确认**：仅提前批+常规批一段、仅本科（默认是，确认即可）。
+- **已知改名校**（可选）：用户是否知道某些学校改名了？
+- **完成判据**：一段线已确认 + `constants.ONE_LINE` 已更新。
+
+### Step 3：更新常量 + 基线
+- 更新 `constants.ONE_LINE`（Step 2）+ `tests/baseline_hashes.py`（三源 SHA256）。
+- **完成判据**：ONE_LINE + baseline_hashes 反映当年数据。
+
+### Step 4：跑确定性管线
+- `.venv/bin/python -m scripts.run_pipeline`（Stage0→1→1.5→3，不调 agent）。
+- **完成判据**：管线跑通，主表+边界表产出，agent prompt 已生成待派发。
+
+### Step 5：派发 agent（harness 侧）
+- `semantic-match/RUN.md`：Stage2 语义匹配 agent。
+- `semantic-match/RUN_VERIFY.md`：**判断型二次复核**（precision-first：粗筛+语义全部须复核）。
+- `research/RUN_RENAME.md`：改名检测 + WebSearch 网查。
+- **完成判据**：三套 agent result jsonl 齐全（batch_*_result / verify_*_result / rename_result）。
+
+### Step 6：回填 + 审计硬门
+- `.venv/bin/python -m scripts.run_pipeline --with-agent-results`（回填最终主表+边界表）。
+- `.venv/bin/python -m scripts.audit_output` → **exit 0 才算完成**（主表零错配/0空匹配阶段/0空行/J-T一致）。
+- **完成判据**：audit exit 0。
+
+### Step 7：产出报告
+- 生成 `output/数据整理报告.md`（markdown，讲清表格关系/作用/口径/阶段分布/列说明，基于真实当年数字）。
+- **完成判据**：报告文档产出 + audit exit 0 + `.venv/bin/python -m pytest` 全绿 + `ruff check` 无错。
 
 ## 铁律
 
@@ -145,40 +176,15 @@ disable-model-invocation: true
 
 flag 列「是」即满足、「非空」即可筛。边界表（新增/被删/特殊/改名/新增校/停招）仍保留原单一日志列（不拆）。
 
-## 年度复用步骤
+## 完成判据（v5，每项必过才算完成）
 
-1. 替换 `data/` 下三个 xlsx（文件名不变；若改名同步改 `constants.py` 列索引 +
-   `run_pipeline.SOURCE_FILES`）。
-2. 更新 `constants.ONE_LINE`（新年份一段线）+ `tests/baseline_hashes.py`（三源 SHA256）。
-3. `.venv/bin/python -m scripts.run_pipeline`（确定性链，不调 agent）。
-4. harness 侧：`semantic-match/RUN.md` 派发 Stage2 agent；`semantic-match/RUN_VERIFY.md`
-   派发**判断型二次复核**（v5：粗筛 + 语义全部须复核，~5500 条 ÷ 20 ≈ 275 批）；
-   `research/RUN_RENAME.md` 派发改名检测 + 网查。
-5. `run_pipeline --with-agent-results` 回填最终主表 + 边界表（apply Stage2 + 复核 + 改名）。
-6. **审计硬门（年度复用前必跑，spec V5-3）**：
-
-   ```bash
-   .venv/bin/python -m scripts.audit_output \
-       --output-dir output --data-dir data \
-       --intermediate-dir intermediate --semantic-dir semantic-match
-   # 必须 exit 0 才算完成（陷阱 B：pytest 全绿 ≠ 真实产出正确）
-   ```
-
-   或一键端到端验收（v5 Slice D）：`.venv/bin/python -m scripts.run_iter2_acceptance`
-   （重跑管线 + 审计，exit 0 即过；可作 `pytest -m manual` 单点跑）。
-7. **产出报告文档** `output/数据整理报告.md`（markdown）：讲清各表格作用、相互关系、
-   匹配阶段分布、关键口径（线差/精度/T 策略/precision-first/选科非差异化）、列说明、
-   年度复用入口。**不赘述也不精简**——目的是让他人一眼看懂这套表格。以现有报告为模板，
-   用 audit + 逐表统计的真实当年数字填充。
-
-**完成判据（v5）**：
 - `output/` 下 8 张表齐全；`.venv/bin/python -m pytest` 全绿且覆盖率 ≥80%、`ruff check` 无错。
-- **数据质量审计 exit 0**（主表零错配[判断型经复核确定] / 0 空匹配阶段 / 0 全空行 /
-  字段映射回归 / J-T 一致[精度区分]）。
-- 三源 SHA256 不变；每个本科专业行 100% 归类（匹配/新增/被删/特殊/改名五类之一）。
-- 精度 ≤2 位（新算舍入；matched 保留源值）；新增估算 (J,T) 齐；单年 T 空+单年数据=是；
-  专科全排除；改名表备注已填（网查或人工）。
-- **`output/数据整理报告.md` 已生成**（表格关系/作用/口径/阶段分布，基于真实当年数字）。
+- **数据质量审计 exit 0**（主表零错配[判断型经复核确定] / 0 空匹配阶段 / 0 全空行 / 字段映射回归 / J-T 一致[精度区分]）。
+- 三源 SHA256 不变；每个本科专业行 100% 归类。
+- 精度 ≤2 位；新增估算 (J,T) 齐；单年 T 空+单年数据=是；专科全排除；改名表备注已填。
+- `output/数据整理报告.md` 已生成。
+
+> 年度复用的 7 步执行流程见上方「自主启动流程」。
 
 ## 数据质量审计硬门（v5 spec V5-3）
 
