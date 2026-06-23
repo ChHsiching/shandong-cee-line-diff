@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from scripts.constants import (
+    BATCH_EARLY_A,
+    BATCH_EARLY_B,
     J3_BASE_MAJOR,
     J3_BATCH,
     J3_BATCH_REGULAR,
@@ -54,6 +56,7 @@ __all__ = [
     "build_history_early",
     "build_unified_history",
     "build_dagluben_regular",
+    "build_dagluben_early",
     "write_history_csv",
     "write_dagluben_csv",
 ]
@@ -249,6 +252,56 @@ def build_dagluben_regular(rows: Iterable[Sequence]) -> list[DaglubenRow]:
                 core=core,
                 subject=subject,
                 batch=str(batch),
+                src_row_idx=row_idx,
+            )
+        )
+    return out
+
+
+def build_dagluben_early(rows: Iterable[Sequence]) -> list[DaglubenRow]:
+    """Extract大绿本 提前批 A类 + B类 本科专业 rows into one merged pool.
+
+    Spec §3 / §4.2: AB 类无差别, merged into a single matching pool whose
+    ``batch`` is the unified label ``提前批`` (constants.TQ_BATCH_EARLY) so it
+    keys against the提前批 history pool built by :func:`build_history_early`.
+
+    专业行 = 代号(E, idx4) and 名称(F, idx5) both non-empty. Subtitles carrying
+    the专科 keyword are excluded — the 181 ``定向培养军士生(专科)`` rows in B类
+    are vocational and dropped (spec §3: 专科全排除), yielding 1139 + 446 = 1585
+    early-batch本科 majors.
+    """
+    early_batches: frozenset[str] = frozenset({BATCH_EARLY_A, BATCH_EARLY_B})
+    out: list[DaglubenRow] = []
+    for row_idx, row in enumerate(rows, start=1):
+        if _is_header(row):
+            continue
+        batch = _cell(row, 0)
+        if batch not in early_batches:
+            continue
+        subtitle = _cell(row, 1) or ""
+        if _looks_zhuanke(subtitle):
+            continue
+        code = _cell(row, 4)
+        name = _cell(row, 5)
+        if code in (None, "") or name in (None, ""):
+            continue
+
+        school = nfk(_cell(row, 3) or "")
+        school_cat = nfk(subtitle) if subtitle != "" else ""
+        major = nfk(name)
+        stripped = strip_ignore_brackets(name)
+        core = nfk(core_of(name))
+        subject = nfk(_cell(row, 6) or "")
+
+        out.append(
+            DaglubenRow(
+                school=school,
+                school_cat=school_cat,
+                major=major,
+                stripped=stripped,
+                core=core,
+                subject=subject,
+                batch=TQ_BATCH_EARLY,
                 src_row_idx=row_idx,
             )
         )
