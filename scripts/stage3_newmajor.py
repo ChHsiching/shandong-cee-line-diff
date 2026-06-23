@@ -144,12 +144,14 @@ def estimate(
     # 退化0: 同校 + 选科集合包含.
     value0, n0 = _level0_value(new_major_row, same_school)
     if value0 is not None:
+        value0 = round(value0, 2)  # 舍入 2 位，匹配近三年源精度。
         log = f"新增专业：估算=同校同选科({n0})均值={_fmt_value(value0)}"
         return EstimateResult(value=value0, level=0, n=n0, log=log)
 
     # 退化1: 同校无同选科 (或兼容行全无 J) → 同校全专业均值.
     value1, n1 = _level1_value(same_school)
     if value1 is not None:
+        value1 = round(value1, 2)  # 舍入 2 位，匹配近三年源精度。
         log = f"新增专业：退化=同校全专业均值(无同选科)({n1})={_fmt_value(value1)}"
         return EstimateResult(value=value1, level=1, n=n1, log=log)
 

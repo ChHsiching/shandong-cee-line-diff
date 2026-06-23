@@ -24,8 +24,8 @@ def test_compute_three_year_mean_and_pstdev():
     # line diffs: 524-441=83, 568-444=124, 500-443=57
     diffs = [83, 124, 57]
     stat, std = line_diff.compute(lows, ONE_LINE)
-    assert stat == statistics.mean(diffs)
-    assert std == statistics.pstdev(diffs)
+    assert stat == round(statistics.mean(diffs), 2)
+    assert std == round(statistics.pstdev(diffs), 2)
 
 
 def test_compute_three_year_stat_rounded_value():

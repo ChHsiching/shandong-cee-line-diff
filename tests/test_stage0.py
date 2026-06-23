@@ -262,7 +262,7 @@ def test_build_history_early_computes_J_T_from_low_scores_minus_one_line():
     assert row["J"] == 88.0          # mean(83,124,57)
     assert row["T"] is not None      # pstdev of 3 samples
     import statistics
-    assert row["T"] == statistics.pstdev([83, 124, 57])  # ≈ 27.58
+    assert row["T"] == round(statistics.pstdev([83, 124, 57]), 2)  # ≈ 27.58
 
 
 def test_build_history_early_single_year_J_no_T():

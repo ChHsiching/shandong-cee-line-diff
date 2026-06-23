@@ -200,14 +200,18 @@ def _validate_and_build(
         )
 
     # J/T must echo the matched candidate's values (agent must not fabricate).
+    # 舍入到 2 位再比较：精度统一后，历史候选已舍入（line_diff/estimate round 2），
+    # 而 agent 结果可能是旧未舍入值；按 2 位对齐避免误报不一致。
     expected_j = matched_hist.get("J")
     expected_t = matched_hist.get("T")
-    if j_raw != expected_j:
+    j_cmp = round(j_raw, 2) if isinstance(j_raw, float) else j_raw
+    t_cmp = round(t_raw, 2) if isinstance(t_raw, float) else t_raw
+    if j_cmp != expected_j:
         raise Stage2ContractError(
             f"{path.name}:{lineno}: src_row_idx={idx} J={j_raw!r} 与候选 "
             f"{match_major!r} 的 J={expected_j!r} 不一致"
         )
-    if t_raw != expected_t:
+    if t_cmp != expected_t:
         raise Stage2ContractError(
             f"{path.name}:{lineno}: src_row_idx={idx} T={t_raw!r} 与候选 "
             f"{match_major!r} 的 T={expected_t!r} 不一致"

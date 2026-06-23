@@ -59,4 +59,5 @@ def compute(
         return None, None
     stat = statistics.mean(diffs)
     std: float | None = statistics.pstdev(diffs) if len(diffs) >= 2 else None
-    return stat, std
+    # 舍入到 2 位，匹配近三年源表精度（源 T 为 2 位，如 12.73）；避免长浮点。
+    return round(stat, 2), (round(std, 2) if std is not None else None)
