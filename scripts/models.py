@@ -63,3 +63,23 @@ class EstimateResult(TypedDict, total=False):
     level: int              # 0 同校同选科 / 1 同校全专业 / 2 整校无历史
     log: str
     n: int                  # 样本量
+
+
+class RenameRow(TypedDict, total=False):
+    """One row of 学校改名表 (Slice 6 Task 6.2).
+
+    A candidate rename pairing produced by the agent semantic step. The
+    harness applies agent jsonl via :func:`scripts.rename_detect.apply_rename`
+    to build this table; the school's大绿本 majors are then left with J/T
+    empty in the main output and flagged for human review (spec §6 Stage 3
+    改名). ``manual_reviewed`` guards备注 idempotency against re-runs of the
+    rename web-search step (Plan v2 binding).
+    """
+
+    new_school: str           # 2026 大绿本校名 (改名后)
+    old_school: str           # 候选旧校名 (改名前)
+    confidence: float         # agent 置信度 [0,1]
+    is_rename: bool           # agent 最终判定（False = 候选不构成改名）
+    major_count_2026: int     # 该校 2026 本科专业数（辅助人工核验）
+    remark: str               # 备注（最后一步网查写入；可被人工编辑）
+    manual_reviewed: bool     # 备注 是否已经人工编辑（True 则网查不覆盖）
