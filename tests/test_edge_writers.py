@@ -42,9 +42,8 @@ def _load(path: Path):
 
 def test_write_deleted_major_table(tmp_path: Path) -> None:
     rows = [
-        {"学校": "甲大学", "招生类别": "", "专业": "旧专业",
-         "近三年统计线差": 80.0, "近三年线差标准差": 1.0,
-         "日志": "近三年有、2026 大绿本无"},
+        {"school": "甲大学", "school_cat": "", "major": "旧专业",
+         "J": 80.0, "T": 1.0, "log": "近三年有、2026 大绿本无"},
     ]
     out = tmp_path / "被删旧专业.xlsx"
     write_deleted_major_table(rows, out)
@@ -143,10 +142,10 @@ def test_write_gone_school_table(tmp_path: Path) -> None:
 
 def test_write_special_table(tmp_path: Path) -> None:
     rows = [
-        {"src_row_idx": 7, "学校": "空军航空大学", "招生类别": "",
-         "专业": "飞行技术", "核心名": "飞行技术", "选科": "物理",
-         "批次": "3.提前批—飞行技术(军队)",
-         "日志": "飞行技术(军队)，提前批池匹配不成"},
+        {"src_row_idx": 7, "school": "空军航空大学", "school_cat": "",
+         "major": "飞行技术", "core": "飞行技术", "subject": "物理",
+         "batch": "3.提前批—飞行技术(军队)",
+         "log": "飞行技术(军队)，提前批池匹配不成"},
     ]
     out = tmp_path / "特殊情况.xlsx"
     write_special_table(rows, out)

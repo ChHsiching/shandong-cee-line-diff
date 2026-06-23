@@ -208,8 +208,22 @@ def write_deleted_major_table(
 ) -> None:
     """Write ``被删旧专业.xlsx`` — history majors absent from 2026 at schools
     that still exist in 2026 (and are NOT renamed). Each row carries the
-    original近三年 J/T and log ``近三年有、2026 大绿本无`` (spec §9)."""
-    _write_simple_table(_DELETED_HEADER, deleted, out_path, "被删旧专业")
+    original近三年 J/T and log ``近三年有、2026 大绿本无`` (spec §9).
+
+    DeletedMajor fields (school/school_cat/major/J/T/log) are remapped to the
+    header columns — ``_write_simple_table`` looks cells up by header name."""
+    rows = [
+        {
+            "学校": r.get("school", ""),
+            "招生类别": r.get("school_cat", ""),
+            "专业": r.get("major", ""),
+            "近三年统计线差": r.get("J"),
+            "近三年线差标准差": r.get("T"),
+            "日志": r.get("log", ""),
+        }
+        for r in deleted
+    ]
+    _write_simple_table(_DELETED_HEADER, rows, out_path, "被删旧专业")
 
 
 # --- 学校改名表 -------------------------------------------------------------
@@ -298,8 +312,24 @@ def write_special_table(
 ) -> None:
     """Write ``特殊情况.xlsx`` — 飞行技术(军队) 提前批池匹配不成 + 其余无法
     归类的大绿本行. Each EdgeRow preserves the originating DaglubenRow fields
-    (src_row_idx / school / major / core / subject / batch) + log (spec §9)."""
-    _write_simple_table(_SPECIAL_HEADER, special_rows, out_path, "特殊情况")
+    (src_row_idx / school / major / core / subject / batch) + log (spec §9).
+
+    EdgeRow fields are remapped to the header columns — ``_write_simple_table``
+    looks cells up by header name."""
+    rows = [
+        {
+            "src_row_idx": r.get("src_row_idx", 0),
+            "学校": r.get("school", ""),
+            "招生类别": r.get("school_cat", ""),
+            "专业": r.get("major", ""),
+            "核心名": r.get("core", ""),
+            "选科": r.get("subject", ""),
+            "批次": r.get("batch", ""),
+            "日志": r.get("log", ""),
+        }
+        for r in special_rows
+    ]
+    _write_simple_table(_SPECIAL_HEADER, rows, out_path, "特殊情况")
 
 
 # --- 改名校专业主产出标记 ---------------------------------------------------

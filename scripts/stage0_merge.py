@@ -24,6 +24,7 @@ from typing import Iterable, Sequence
 from scripts.constants import (
     BATCH_EARLY_A,
     BATCH_EARLY_B,
+    FLIGHT_BATCH,
     J3_BATCH,
     J3_BATCH_REGULAR,
     J3_BRACKET,
@@ -262,10 +263,12 @@ def build_dagluben_early(rows: Iterable[Sequence]) -> list[DaglubenRow]:
 
     专业行 = 代号(E, idx4) and 名称(F, idx5) both non-empty. Subtitles carrying
     the专科 keyword are excluded — the 181 ``定向培养军士生(专科)`` rows in B类
-    are vocational and dropped (spec §3: 专科全排除), yielding 1139 + 446 = 1585
+    are vocational and dropped (spec §3: 专科全排除), yielding 1139 + 446 + 2(飞行) = 1587
     early-batch本科 majors.
     """
-    early_batches: frozenset[str] = frozenset({BATCH_EARLY_A, BATCH_EARLY_B})
+    early_batches: frozenset[str] = frozenset(
+        {BATCH_EARLY_A, BATCH_EARLY_B, FLIGHT_BATCH}
+    )
     out: list[DaglubenRow] = []
     for row_idx, row in enumerate(rows, start=1):
         if _is_header(row):

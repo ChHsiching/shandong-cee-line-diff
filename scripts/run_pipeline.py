@@ -299,12 +299,25 @@ def _build_main_results(
                 T=None,
                 log=est.get("log", ""),
             )
-        # Rows with neither estimate nor rename marker have no MatchResult here;
-        # they are surfaced via the special edge table by the caller.
+        else:
+            # 特殊: 未匹配本科。spec 要求每行都有日志，兜底发特殊情况日志
+            # （详情见 output/特殊情况.xlsx）。
+            from scripts.constants import LOG_SPECIAL_UNMATCHED
+            by_idx[idx] = MatchResult(
+                src_row_idx=idx,
+                school=school,
+                school_cat=d.get("school_cat", ""),
+                major=d.get("major", ""),
+                matched=False,
+                J=None,
+                T=None,
+                log=LOG_SPECIAL_UNMATCHED,
+            )
 
-    # Emit in dagluben order for stable downstream output.
-    return [by_idx[d["src_row_idx"]] for d in dagluben
-            if d["src_row_idx"] in by_idx]
+    # Emit in dagluben order for stable downstream output. Every 本科 row now
+    # carries a MatchResult (matched / 新增 / 改名 / 特殊), so no row is left
+    # without a 匹配日志.
+    return [by_idx[d["src_row_idx"]] for d in dagluben]
 
 
 def run(

@@ -126,10 +126,10 @@ class TestZhuankeSmoke:
         assert all("专科" not in (r.get("school_cat", "") or "") for r in regular)
         assert all("专科" not in (r.get("school_cat", "") or "") for r in early)
 
-        # The 181 rows must be absent from the combined 本科 pool: 23887 + 1585
-        # (regular + early本科) — none of them carry 专科.
+        # The 181 rows must be absent from the combined 本科 pool: 23887 + 1587
+        # (regular + early本科 incl 2 飞行) — none of them carry 专科.
         combined = len(regular) + len(early)
-        assert combined == 23887 + 1585
+        assert combined == 23887 + 1587
 
 
 # === Rule 2: 选科 non-differentiation (RED — drift does not block match) =====

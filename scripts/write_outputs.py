@@ -20,6 +20,7 @@ from typing import Iterable
 
 import openpyxl
 
+from scripts.constants import LOG_ZHUANKE_OUT_OF_SCOPE
 from scripts.models import MatchResult
 
 __all__ = [
@@ -96,13 +97,19 @@ def write_hierarchical(
         # Iterate over rows; row index in openpyxl is 1-based and matches
         # src_row_idx (header is row 1).
         for row_idx in range(2, ws.max_row + 1):
-            res = results_by_idx.get(row_idx)
-            if res is None:
-                continue
-            # Defensive: only fill if this is actually a major row.
+            # Defensive: only act on 专业行 (代号+名称 非空).
             code = ws.cell(row=row_idx, column=COL_CODE).value
             name = ws.cell(row=row_idx, column=COL_NAME).value
             if code in (None, "") or name in (None, ""):
+                continue
+            subtitle = ws.cell(row=row_idx, column=2).value
+            res = results_by_idx.get(row_idx)
+            if res is None:
+                # 专业行 无结果 = 专科（本科行经 Fix B 均有 MatchResult）。
+                # 标注超范围，避免「莫名其妙」空白。
+                if "专科" in str(subtitle or ""):
+                    ws.cell(row=row_idx, column=COL_LOG,
+                            value=LOG_ZHUANKE_OUT_OF_SCOPE)
                 continue
             ws.cell(row=row_idx, column=COL_J, value=res.get("J"))
             ws.cell(row=row_idx, column=COL_T, value=res.get("T"))
@@ -151,6 +158,9 @@ def write_flat(
                 for c in range(1, 13)
             ]
             if not _is_major_row(cells):
+                continue
+            # 专科 专业行不在本次整理范围（仅本科），扁平版剔除。
+            if "专科" in str(cells[1] or ""):
                 continue
             for col_idx, val in enumerate(cells, start=1):
                 out_ws.cell(row=out_row, column=col_idx, value=val)

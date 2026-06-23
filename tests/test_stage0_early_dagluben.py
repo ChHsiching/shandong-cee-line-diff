@@ -74,7 +74,7 @@ def test_build_dagluben_early_normalises_fields_like_regular():
 
 class TestStage0EarlySmoke:
     def test_smoke_dagluben_early_row_count(self, repo_root: Path):
-        """大绿本 提前批 本科专业 = A类 1139 + B类本科 446 = 1585
+        """大绿本 提前批 本科专业 = A类 1139 + B类本科 446 + 飞行技术(军队) 2 = 1587
         (B类 181 定向培养军士生(专科) rows excluded per spec §3)."""
         import openpyxl
 
@@ -85,7 +85,7 @@ class TestStage0EarlySmoke:
         rows = list(wb[wb.sheetnames[0]].iter_rows(values_only=True))
         wb.close()
         built = stage0_merge.build_dagluben_early(rows)
-        assert len(built) == 1585
+        assert len(built) == 1587
 
 
 # --- Stage 1 covers early batch (RED contract) -----------------------------
