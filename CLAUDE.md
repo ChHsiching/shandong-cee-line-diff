@@ -26,6 +26,8 @@
 | Agent | `ToolSearch select:Agent` | `Agent({ subagent_type: "general-purpose", description: "probe", prompt: "只回复数字 42" })` | ✅ 返回 `42` |
 | AskUserQuestion | `ToolSearch select:AskUserQuestion` | `AskUserQuestion({ questions: [...] })` | ✅ 用户成功作答 |
 
+> 复测确认（2026-06-23 当日复跑）：三项 probe 结果与上表完全一致；一次 `ToolSearch select:Skill,Agent,AskUserQuestion`（逗号分隔）即可同时载入三者 schema——**批量 `select:` 已验证可用**，不必逐个载入。
+
 ### 正确调用范式
 
 1. 需要某工具时，先 `ToolSearch select:<ToolName>[,<Other>...]` 载入其 schema。
