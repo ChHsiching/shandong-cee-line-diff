@@ -99,6 +99,32 @@ class VerifyApplyResult(TypedDict, total=False):
     verdict_by_idx: dict   # dict[int, str]
 
 
+class StructuredLog(TypedDict):
+    """The 5 structured columns parsed from the legacy single「匹配日志」string
+    (iteration-3, spec §2.1).
+
+    Replaces the single ``log`` cell on the main table (hierarchical + flat).
+    Key order is FIXED and matches the appended column order in write_outputs
+    (J/T + these 5 = 7 row-end columns).
+
+    - ``匹配阶段``: 严格匹配 / 粗筛匹配 / 语义匹配 / 新增专业 / 特殊情况 /
+      复核存疑 / 疑似改名校 / 新校无历史 / 专科（超范围）; "" when unknown.
+    - ``单年数据`` / ``选科漂移`` / ``复核结果``: flag columns — ``"是"`` when
+      the marker is present, ``""`` otherwise (filtering via「非空」).
+    - ``原因备注``: free-text detail left over after stripping the prefix and
+      the flag markers.
+
+    Total=True (every key required) so write_outputs can rely on
+    ``StructuredLog.values()`` yielding exactly 5 strings in order.
+    """
+
+    匹配阶段: str
+    单年数据: str
+    选科漂移: str
+    复核结果: str
+    原因备注: str
+
+
 class RenameRow(TypedDict, total=False):
     """One row of 学校改名表 (Slice 6 Task 6.2).
 
