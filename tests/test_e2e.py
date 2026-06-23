@@ -42,8 +42,8 @@ from scripts.run_pipeline import run
 #
 #   近三年 (j3) 常规批一段线:
 #     - 示例大学  计算机科学与技术     → strict-matches dl row 1
-#     - 示例大学  数学                  → coarse-matches dl row 2 (核心名唯一)
-#     - 示例大学  历史学                → absent from 2026 → 被删 (school present)
+#     - 示例大学  数学类               → coarse-matches dl row 2 (核心名唯一)
+#     - 示例大学  历史学               → absent from 2026 → 被删 (school present)
 #     - 停招大学  物理                  → school absent from 2026 → 停招消失校
 #
 #   提前批 supplement (tq) 本科提前批A类:
@@ -53,14 +53,12 @@ from scripts.run_pipeline import run
 #     - 4.常规批 示例大学 01 计算机科学与技术  (strict match)
 #     - 4.常规批 示例大学 02 数学类(拔尖)     (coarse match: 数学 core 唯一)
 #     - 4.常规批 示例大学 03 量子信息          (new major: no同校 core)
-#     - 4.常规批 示例大学 04 英语(专科方向)   NOT a专科 row — subtitle carries no
-#                                            专科 keyword; kept as a plain major.
-#                                            We use a real 专科 subtitle row below.
 #     - 4.常规批 专科大学 05 护理             subtitle contains「专科」→ excluded
-#     - 1.提前批A类 飞行大学 06 飞行技术       (early batch, matches tq)
-#     - 3.提前批—飞行技术(军队) 军航大学 07 飞行技术(军队)
-#                                            (FLIGHT_BATCH — special if unmatched)
 #     - 4.常规批 新校 08 人工智能             (new school + new major → 新增 level2)
+#     - 1.提前批A类 飞行大学 06 飞行技术       (early batch, matches tq)
+#     - 4.常规批 军航大学 07 飞行技术(军队)   (NOT new — 军航大学 has 飞行技术
+#                                            core history under a different cat;
+#                                            unmatched → special)
 
 
 _J3_HEADER = [
@@ -84,9 +82,16 @@ def _build_j3(tmp_xlsx):
     rows = [
         _J3_HEADER,
         _j3_row("常规批一段线", "示例大学", "计算机科学与技术", 60.0, 5.0),
-        _j3_row("常规批一段线", "示例大学", "数学", 70.0, None, subject="物理"),
+        _j3_row("常规批一段线", "示例大学", "数学类", 70.0, None, subject="物理"),
         _j3_row("常规批一段线", "示例大学", "历史学", 55.0, 4.0),
         _j3_row("常规批一段线", "停招大学", "物理", 80.0, 3.0),
+        # 军航大学 has a history major with the SAME core (飞行技术) but a
+        # DIFFERENT 招生类别 (地方专项计划). The dagluben 飞行技术(军队) row is
+        # 普通计划 → strict fails (cat differs), coarse fails (different cat
+        # bucket), AND identify_new_majors sees the school has 飞行技术 in its
+        # history cores so it is NOT a真新增 → it falls through to the special
+        # table as a FLIGHT_BATCH unmatched row.
+        _j3_row("常规批一段线", "军航大学(地方专项计划)", "飞行技术", 50.0, 2.0),
         # 常规批二段线 — must be dropped.
         _j3_row("常规批二段线", "示例大学", "应被丢弃", 99.0, 1.0),
     ]
@@ -141,11 +146,10 @@ def _build_dl(tmp_xlsx):
         _dl_row("4.常规批", "普通计划", "08", "新校", "人工智能"),
         # 提前批 A类 飞行大学 飞行技术 (matches tq)
         _dl_row("1.提前批A类", "普通计划", "06", "飞行大学", "飞行技术"),
-        # 飞行技术(军队) batch — unmatched → special
-        [
-            "3.提前批—飞行技术(军队)", "普通计划", "A003", "军航大学",
-            "07", "飞行技术(军队)", "物理", "4", "10", "", "", "",
-        ],
+        # 军航大学 飞行技术(军队) — school has 飞行技术 core history under a
+        # different 招生类别 (地方专项计划) so it is NOT a真新增, but strict/coarse
+        # both fail (different cat / different stripped) → falls to special.
+        _dl_row("4.常规批", "普通计划", "07", "军航大学", "飞行技术(军队)"),
     ]
     return tmp_xlsx(rows)
 
@@ -218,7 +222,14 @@ def test_run_excludes_zhuanke_rows(fixture_workbooks, tmp_path):
 
 
 def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
-    """For every专业 row present in both outputs, J/T/log must match."""
+    """For every专业 row present in both outputs, J/T/log must match.
+
+    Both outputs are written from the same MatchResult list, so every (school,
+    major) pair that appears in both must carry an identical J/T/log triple.
+    We key by (school, major) rather than row position because the flat output
+    omits non-major rows and so its row positions do not align with the
+    hierarchical output's.
+    """
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     run(data_dir, out_dir, with_agent_results=False)
 
@@ -230,22 +241,25 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
     hier = _read_output_major_rows(hier_path)
     flat = _read_output_major_rows(flat_path)
 
-    # Flat is a subset of hierarchical (hierarchical preserves every original
-    # row including非专业; flat keeps only专业 rows). For every src_row_idx
-    # present in both, the J/T/log triple must agree.
-    flat_by_idx = {r["src_row_idx"]: r for r in flat}
+    flat_by_key = {(r["school"], r["major"]): r for r in flat}
     mismatches: list[str] = []
     for h in hier:
-        idx = h["src_row_idx"]
-        if idx not in flat_by_idx:
+        key = (h["school"], h["major"])
+        f = flat_by_key.get(key)
+        if f is None:
             continue
-        f = flat_by_idx[idx]
         if (h["J"], h["T"], h["log"]) != (f["J"], f["T"], f["log"]):
             mismatches.append(
-                f"row {idx}: hier=({h['J']},{h['T']},{h['log']!r}) "
+                f"{key}: hier=({h['J']},{h['T']},{h['log']!r}) "
                 f"flat=({f['J']},{f['T']},{f['log']!r})"
             )
     assert not mismatches, "hierarchical/flat diverged:\n" + "\n".join(mismatches)
+
+    # Every major row in the flat output must also appear in the hierarchical
+    # output (flat is a subset of hierarchical's专业 rows).
+    hier_keys = {(r["school"], r["major"]) for r in hier}
+    for key in flat_by_key:
+        assert key in hier_keys, f"flat row {key} missing from hierarchical"
 
 
 # ---------------------------------------------------------------------------
@@ -304,9 +318,14 @@ def test_classification_counts_on_fixture(fixture_workbooks, tmp_path):
             (data_dir / "山东省2026年大绿本招生计划.xlsx"), read_only=True, data_only=True
         ).active.iter_rows(values_only=True)
     )
+    # Re-derive the本科-only major row count the same way build_dagluben_* do:
+    # exclude rows whose 小标题 (col B, idx 1) carries the专科 keyword.
     majors_by_row = {}
     for i, row in enumerate(dl_rows, start=1):
         if i == 1:
+            continue
+        subtitle = row[1] if len(row) > 1 else ""
+        if subtitle and "专科" in str(subtitle):
             continue
         code = row[4] if len(row) > 4 else None
         name = row[5] if len(row) > 5 else None
@@ -438,6 +457,50 @@ def test_without_rename_results_renamed_set_is_empty_and_logged(
     assert any("改名" in rec.message and "待 harness" in rec.message
                for rec in caplog.records), \
         "expected a 'rename pending harness dispatch' log line"
+
+
+def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_path):
+    """When semantic-match/rename_result.jsonl exists, apply_rename runs and
+    confirmed-renamed大绿本 schools get J/T=None + rename-pending log in the
+    main output, and their history majors are excluded from the被删 table.
+
+    The fixture's「新校」is a大绿本独有校 (no history) → a valid rename target
+    candidate. We stage a stub jsonl marking it as a rename of「旧校」and
+    verify the rename path is applied.
+    """
+    data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
+    semantic_dir = tmp_path / "semantic-match"
+
+    # First run (no agent) to ensure rename candidates are generated.
+    run(data_dir, out_dir, with_agent_results=False, semantic_dir=semantic_dir)
+
+    # Stage a rename result marking 新校 as a rename of 旧校.
+    # 新校 must be a大绿本独有校 (in大绿本, not in history) for the contract.
+    rename_line = json.dumps({
+        "new_school": "新校",
+        "old_school": "旧校",
+        "confidence": 0.9,
+        "is_rename": True,
+    }, ensure_ascii=False)
+    (semantic_dir / "rename_result.jsonl").write_text(
+        rename_line + "\n", encoding="utf-8"
+    )
+
+    report = run(
+        data_dir, out_dir, with_agent_results=True, semantic_dir=semantic_dir,
+    )
+    assert report["rename_applied"] is True
+    assert "新校" in report["renamed_dgl_schools"]
+    # 新校's dagluben row (人工智能) should carry the rename-pending log.
+    rename_rows_in_main = [
+        r for r in report["main_results"]
+        if r.get("school") == "新校"
+    ]
+    assert rename_rows_in_main, "新校 row missing from main_results"
+    for r in rename_rows_in_main:
+        assert r.get("J") is None
+        assert r.get("T") is None
+        assert "疑似改名校" in r.get("log", "")
 
 
 # ---------------------------------------------------------------------------
