@@ -125,6 +125,50 @@ def minimal_hierarchical_dagluben(tmp_path: Path):
 
 
 @pytest.fixture
+def minimal_hierarchical_dagluben_with_zhuanke(tmp_path: Path):
+    """Like :func:`minimal_hierarchical_dagluben` but adds a 专科 专业行 at the
+    end (B-column 小标题 contains「专科」). Used to verify the hierarchical
+    writer annotates 专科 rows with LOG_ZHUANKE_OUT_OF_SCOPE and the flat
+    writer drops them (spec §3).
+    """
+    import openpyxl
+
+    path = tmp_path / "mini_dagluben_zhuanke.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws.append(
+        [
+            "批次", "小标题", "学校代码", "学校名", "代号", "名称",
+            "选考科目要求", "学制", "计划数", "学校备注", "年收费", "整行校准",
+        ]
+    )
+    ws.append(["4.常规批", "", "", "", "", "", "", "", "", "", "", "4.常规批"])
+    ws.append(["4.常规批", "普通计划", "", "", "", "", "", "", "", "", "", "普通计划"])
+    ws.append(
+        ["4.常规批", "普通计划", "A001", "示例大学", "", "", "", "", "100",
+         "本地公办", "", "A001示例大学本地公办100"]
+    )
+    ws.append(
+        ["4.常规批", "普通计划", "A001", "示例大学", "01", "计算机科学与技术",
+         "物理和化学", "4", "2", "", "", "01计算机科学与技术..."]
+    )
+    ws.append(
+        ["4.常规批", "普通计划", "A001", "示例大学", "02", "英语",
+         "不限", "4", "1", "", "", "02英语..."]
+    )
+    # 专科 section: 小标题 carries「专科」, then a 专科 专业行.
+    ws.append(["4.常规批", "专科", "", "", "", "", "", "", "", "", "", "专科"])
+    ws.append(
+        ["4.常规批", "专科", "A002", "示例职院", "03", "应用化工技术",
+         "不限", "3", "1", "", "", "03应用化工技术..."]
+    )
+    wb.save(path)
+    wb.close()
+    return path
+
+
+@pytest.fixture
 def minimal_history_rows():
     """Parsed近三年-style rows as plain dicts (post-build_history_regular shape)."""
     return [
