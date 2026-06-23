@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import openpyxl
-import pytest
 
 from scripts import write_outputs
 from scripts.constants import LOG_STRICT
@@ -30,7 +29,6 @@ def test_hierarchical_preserves_all_rows_and_appends_three_columns(
     # Capture the original 6 rows (header + 批次头 + 小标题 + 学校 + 2专业).
     orig_rows = _read_sheet(minimal_hierarchical_dagluben)
     assert len(orig_rows) == 6
-    orig_width = len([c for c in orig_rows[0] if c is not None])
 
     results = [
         MatchResult(src_row_idx=5, school="示例大学", school_cat="普通计划",

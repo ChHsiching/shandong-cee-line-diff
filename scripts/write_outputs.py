@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Iterable
 
 import openpyxl
-from openpyxl.utils import get_column_letter
 
 from scripts.models import MatchResult
 

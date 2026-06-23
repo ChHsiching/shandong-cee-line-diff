@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 
 from scripts.models import DaglubenRow, HistoryRow
-from scripts.stage2_agent import Batch, build_batches, write_prompts
+from scripts.stage2_agent import build_batches, write_prompts
 from scripts.stage2_apply import apply_results
 
 

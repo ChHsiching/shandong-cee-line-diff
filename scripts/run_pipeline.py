@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import argparse
 import collections
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -63,7 +62,6 @@ from scripts.stage3_edges import deleted_majors, flight_and_special
 from scripts.stage3_newmajor import estimate
 from scripts.write_edge_tables import (
     identify_new_majors,
-    mark_newmajor_in_main,
     write_deleted_major_table,
     write_gone_school_table,
     write_new_major_table,

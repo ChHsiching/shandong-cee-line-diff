@@ -309,7 +309,6 @@ def test_classification_counts_on_fixture(fixture_workbooks, tmp_path):
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     report = run(data_dir, out_dir, with_agent_results=False)
 
-    by_idx = {r["src_row_idx"]: r for r in report["main_results"]}
     # Row 4 in fixture = 示例大学 计算机科学与技术 → strict match.
     # We need the actual src_row_idx values. They are 1-based row indices in the
     #大绿本 workbook. Build the expected map by re-reading the source.
@@ -389,8 +388,6 @@ def test_without_agent_results_prompts_are_written_and_logged(
             semantic_dir=semantic_dir,
         )
 
-    # Prompts written for whichever rows survived strict+coarse.
-    prompts = list(semantic_dir.glob("batch_*_prompt.json"))
     # If strict+coarse already resolved everything, prompts may be empty; that
     # is legitimate. The key contract is: no result jsonl applied.
     assert report["stage2_applied"] is False

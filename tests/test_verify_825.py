@@ -14,7 +14,6 @@ import csv
 from pathlib import Path
 from typing import Iterable, Sequence
 
-import pytest
 
 from scripts import verify_825
 

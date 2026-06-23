@@ -11,7 +11,6 @@ so the two dicts cannot be passed in the wrong order.
 
 from __future__ import annotations
 
-import math
 import statistics
 
 from scripts import line_diff

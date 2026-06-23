@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Sequence, TypedDict
 
-from scripts.constants import FLIGHT_BATCH, LOG_DELETED, LOG_FLIGHT_UNMATCHED
+from scripts.constants import LOG_DELETED, LOG_FLIGHT_UNMATCHED
 from scripts.models import DaglubenRow, HistoryRow
 
 __all__ = [

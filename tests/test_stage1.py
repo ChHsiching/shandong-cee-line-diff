@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from scripts import stage1_strict
 from scripts.constants import LOG_STRICT

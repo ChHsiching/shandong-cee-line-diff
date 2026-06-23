@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-from pathlib import Path
 
 import pytest
 
@@ -50,7 +48,6 @@ def test_assert_unchanged_raises_on_drift(tmp_xlsx):
 # --- load_source ----------------------------------------------------------
 
 def test_load_source_returns_read_only_workbook(tmp_xlsx):
-    import openpyxl
 
     path = tmp_xlsx([["col1", "col2"], ["a", "b"], ["c", "d"]])
     wb = io_source.load_source(path)
