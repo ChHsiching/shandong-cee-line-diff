@@ -72,6 +72,33 @@ class EstimateResult(TypedDict, total=False):
     n: int                  # 样本量
 
 
+class VerifyResult(TypedDict, total=False):
+    """One judgmental-match second-pass verification verdict (V5-0, Slice B).
+
+    The verification agent re-examines a previously-decided match and returns
+    either「确定」(confirmed — keep in main table) or「存疑」(uncertain —
+    demote to special table). It never alters J/T, only the row's fate.
+    """
+
+    src_row_idx: int        # -> DaglubenRow.src_row_idx of the verified match
+    verdict: str            # "确定" | "存疑"
+    reason: str             # 非空 reason for the verdict
+
+
+class VerifyApplyResult(TypedDict, total=False):
+    """Outcome of applying verification verdicts back into the pipeline.
+
+    Per Plan v2 binding: ``confirmed`` keeps the original MatchResult (verdict
+    「确定」); ``demoted`` carries the存疑 rows as EdgeRows (so they flow to the
+    特殊表), enriched with the dagluben core/subject/batch; ``verdict_by_idx``
+    maps every seen src_row_idx to its verdict for downstream filtering.
+    """
+
+    confirmed: list        # list[MatchResult] (verdict=确定)
+    demoted: list          # list[EdgeRow] (verdict=存疑)
+    verdict_by_idx: dict   # dict[int, str]
+
+
 class RenameRow(TypedDict, total=False):
     """One row of 学校改名表 (Slice 6 Task 6.2).
 

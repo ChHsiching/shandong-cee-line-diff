@@ -23,6 +23,8 @@ semantic-match/*
 !semantic-match/.gitkeep
 !semantic-match/prompt.md
 !semantic-match/RUN.md
+!semantic-match/verify_prompt.md
+!semantic-match/RUN_VERIFY.md
 research/*
 !research/.gitkeep
 !research/RUN_RENAME.md
