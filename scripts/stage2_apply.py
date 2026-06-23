@@ -28,7 +28,7 @@ from typing import Iterable, Sequence
 
 from scripts.constants import LOG_SEMANTIC_NULL_PREFIX, LOG_SEMANTIC_PREFIX, LOG_SUBJECT_DRIFT
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
-from scripts.stage1_strict import normalise_cat
+from scripts.stage1_strict import normalise_cat, single_year_note
 from scripts.stage2_agent import _core_compatible  # reuse the pre-filter
 
 __all__ = [
@@ -218,6 +218,9 @@ def _validate_and_build(
         )
 
     log = f"{LOG_SEMANTIC_PREFIX}：{reason}{_subject_drift_note(dagluben, matched_hist)}"
+    note = single_year_note(matched_hist)
+    if note:
+        log = f"{log}；{note}"
     return MatchResult(
         src_row_idx=idx,
         school=dagluben.get("school", ""),

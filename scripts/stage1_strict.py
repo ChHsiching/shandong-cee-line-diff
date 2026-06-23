@@ -17,12 +17,28 @@ from typing import Iterable
 from scripts.constants import LOG_STRICT
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 
-__all__ = ["match_strict", "normalise_cat", "LOG_MISS"]
+__all__ = ["match_strict", "normalise_cat", "single_year_note", "LOG_MISS"]
 
 LOG_MISS = "未命中"
 
 # 大绿本 subtitle for the default普通 track; folded to "" (= history default).
 DEFAULT_CAT_DAGLUBEN = "普通计划"
+
+# V5-1: 近三年 rows with only a single year of data have no defined standard
+# deviation (T). Such matched rows leave T=None and the match log appends this
+# note so a reviewer sees why T is blank. Shared by stage1_strict /
+# stage1_5_coarse / stage2_apply (Plan v2 binding — three anchors, one helper).
+LOG_SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+
+
+def single_year_note(hist: HistoryRow) -> str:
+    """Return the single-year-T annotation if ``hist`` has no T, else "".
+
+    A matched近三年 row whose ``T`` is None was computed from a single year
+    of data (standard deviation is undefined for n<2). Per V5-1 the match log
+    must annotate this so the blank T is not mistaken for missing data.
+    """
+    return LOG_SINGLE_YEAR_NOTE if hist.get("T") is None else ""
 
 
 def normalise_cat(cat: str) -> str:
@@ -77,6 +93,8 @@ def match_strict(
         key = _dagluben_key(d)
         h = index.get(key)
         if h is not None:
+            note = single_year_note(h)
+            log = LOG_STRICT if not note else f"{LOG_STRICT}；{note}"
             out.append(
                 MatchResult(
                     src_row_idx=d.get("src_row_idx", 0),
@@ -86,7 +104,7 @@ def match_strict(
                     matched=True,
                     J=h.get("J"),
                     T=h.get("T"),
-                    log=LOG_STRICT,
+                    log=log,
                 )
             )
         else:

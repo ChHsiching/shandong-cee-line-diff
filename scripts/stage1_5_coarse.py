@@ -36,7 +36,7 @@ from scripts.constants import (
 )
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 from scripts.normalize import diff_brackets
-from scripts.stage1_strict import normalise_cat
+from scripts.stage1_strict import normalise_cat, single_year_note
 
 __all__ = [
     "build_core_idx",
@@ -118,12 +118,16 @@ def _subject_differs(dl_subject: str, hist_subject: str) -> bool:
 def _accept(
     dagluben: DaglubenRow, candidate: HistoryRow, base_log: str
 ) -> MatchResult:
-    """Build an accepted MatchResult, appending the选科 drift note if needed."""
+    """Build an accepted MatchResult, appending the选科 drift note and the
+    single-year-T note if applicable."""
     log = base_log
     if _subject_differs(
         dagluben.get("subject", ""), candidate.get("subject", "")
     ):
         log = f"{log}；{LOG_SUBJECT_DRIFT}"
+    note = single_year_note(candidate)
+    if note:
+        log = f"{log}；{note}"
     return MatchResult(
         src_row_idx=dagluben.get("src_row_idx", 0),
         school=dagluben.get("school", ""),
