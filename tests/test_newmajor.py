@@ -68,13 +68,15 @@ def _dagluben(school: str, subject: str) -> DaglubenRow:
 
 
 def _hist(
-    school: str, subject: str, j: float | None, *, cat: str = ""
+    school: str, subject: str, j: float | None, *, cat: str = "",
+    t: float | None = None,
 ) -> HistoryRow:
     return HistoryRow(
         school=school,
         school_cat=cat,
         subject=subject,
         J=j,
+        T=t,
         major="历史专业",
     )
 
@@ -169,6 +171,99 @@ def test_estimate_returns_typed_dict_with_all_fields() -> None:
     new_major = _dagluben("示例大学", "物理和化学")
     history = [_hist("示例大学", "物理和化学", 80.0)]
     result: EstimateResult = estimate(new_major, history)
-    # TypedDict total=False allows .get, but the estimator must populate all
+    # TypedDict totalFalse allows .get, but the estimator must populate all
     # four keys so downstream writers can rely on them.
     assert set(result.keys()) >= {"value", "level", "log", "n"}
+
+
+# ---------------------------------------------------------------------------
+# V5-1 / V5-6 — T (线差标准差) estimation + 2-decimal rounding (Slice A)
+# ---------------------------------------------------------------------------
+
+
+def test_estimate_level0_returns_T_same_school_same_subject_average() -> None:
+    # 退化0: T = mean of compatible history rows' T (excludes T=None rows).
+    new_major = _dagluben("示例大学", "物理和化学")
+    history = [
+        _hist("示例大学", "物理 | 物理和化学", 80.0, t=10.0),  # compatible, has T
+        _hist("示例大学", "物理和化学和生物", 100.0, t=20.0),  # compatible, has T
+        _hist("示例大学", "物理 | 物理和化学", 90.0, t=None),  # compatible but no T (excluded)
+        _hist("示例大学", "历史", 50.0, t=999.0),              # not compatible
+    ]
+    result = estimate(new_major, history)
+    assert result["level"] == 0
+    assert result["value"] == 90.0  # mean(80, 100)
+    assert result["T"] == 15.0       # mean(10, 20) — excludes None row
+    assert result["n"] == 2
+
+
+def test_estimate_level0_T_none_when_all_compatible_rows_lack_T() -> None:
+    # All compatible rows have T=None → T=None, J still computed.
+    new_major = _dagluben("示例大学", "物理和化学")
+    history = [
+        _hist("示例大学", "物理和化学", 80.0, t=None),
+        _hist("示例大学", "物理和化学", 100.0, t=None),
+    ]
+    result = estimate(new_major, history)
+    assert result["level"] == 0
+    assert result["value"] == 90.0
+    assert result["T"] is None
+
+
+def test_estimate_level1_returns_T_whole_school_average() -> None:
+    # 退化1: T = mean over all same-school history rows that have a T.
+    new_major = _dagluben("示例大学", "物理和化学")
+    history = [
+        _hist("示例大学", "历史", 50.0, t=5.0),
+        _hist("示例大学", "政治", 70.0, t=15.0),
+        _hist("示例大学", "政治", 60.0, t=None),  # excluded from T mean
+        _hist("其他大学", "物理和化学", 999.0, t=999.0),
+    ]
+    result = estimate(new_major, history)
+    assert result["level"] == 1
+    assert result["value"] == 60.0  # mean(50, 70)
+    assert result["T"] == 10.0       # mean(5, 15)
+
+
+def test_estimate_level2_T_is_none_when_no_history() -> None:
+    new_major = _dagluben("全新大学", "物理和化学")
+    result = estimate(new_major, [])
+    assert result["level"] == 2
+    assert result["value"] is None
+    assert result["T"] is None
+
+
+def test_estimate_level2_T_is_none_when_history_has_no_J() -> None:
+    # Same-school rows exist but all J=None → level 2 → T None.
+    new_major = _dagluben("示例大学", "物理和化学")
+    history = [
+        _hist("示例大学", "物理和化学", None, t=10.0),
+    ]
+    result = estimate(new_major, history)
+    assert result["level"] == 2
+    assert result["value"] is None
+    assert result["T"] is None
+
+
+def test_estimate_rounds_T_to_two_decimals() -> None:
+    # V5-6: T must be rounded to 2 decimals like J.
+    new_major = _dagluben("示例大学", "物理和化学")
+    history = [
+        _hist("示例大学", "物理和化学", 80.0, t=10.333),
+        _hist("示例大学", "物理和化学", 90.0, t=20.667),
+    ]
+    result = estimate(new_major, history)
+    # mean(10.333, 20.667) = 15.5 → round 2 = 15.5
+    assert result["T"] == round((10.333 + 20.667) / 2, 2)
+
+
+def test_estimate_always_has_T_key() -> None:
+    # EstimateResult must carry a T field on every level (V5-1).
+    for history, expected_level in [
+        ([_hist("示例大学", "物理和化学", 80.0, t=5.0)], 0),
+        ([_hist("示例大学", "历史", 80.0, t=5.0)], 1),
+        ([], 2),
+    ]:
+        result = estimate(_dagluben("示例大学", "物理和化学"), history)
+        assert result["level"] == expected_level
+        assert "T" in result
