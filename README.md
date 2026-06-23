@@ -6,6 +6,9 @@
 ## 安装 / 下载本 skill
 
 本仓库既是数据整理工具，也是 `cee-admission-match` skill 的下载源。
+Skill 采用 Anthropic 开放格式（SKILL.md），**Claude Code 和 OpenAI Codex 均原生支持**。
+
+### Claude Code
 
 **方式1：clone 仓库（推荐，含代码 + skill + 目录结构）**
 
@@ -22,9 +25,20 @@ git clone git@github.com:ChHsiching/cee-admission-data.git
 cp -r cee-admission-data/skills/cee-admission-match ~/.claude/skills/
 ```
 
-**使用**：替换 `data/` 下三个 xlsx 为当年数据 → 在 Claude Code 中调用
-`Skill("cee-admission-match")` → skill 自主启动（识别文件 → AskUserQuestion 问一段线/范围
-→ 跑管线 → 派发 agent → 审计 exit 0 → 产出报告）。
+### OpenAI Codex
+
+Codex 已采用 Anthropic 开放 skill 格式，SKILL.md 开箱即用（[官方文档](https://developers.openai.com/codex/skills)）。
+
+**方式1：Skill Installer（推荐）**——在 Codex CLI 中输入 `$`，选择 Skill Installer，
+粘贴仓库 URL：`github.com/ChHsiching/cee-admission-data`。
+
+**方式2：手动安装**——clone 后复制 skill 目录到 Codex skills 路径。
+
+### 使用
+
+替换 `data/` 下三个 xlsx 为当年数据 → 调用 `Skill("cee-admission-match")` →
+skill 自主启动（识别文件 → AskUserQuestion 问一段线/范围 → 跑管线 → 派发 agent →
+审计 exit 0 → 产出报告）。
 
 ## 目录结构
 
