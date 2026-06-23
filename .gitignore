@@ -19,6 +19,7 @@ intermediate/*
 !intermediate/.gitkeep
 output/*
 !output/.gitkeep
+!output/*.md
 semantic-match/*
 !semantic-match/.gitkeep
 !semantic-match/prompt.md
