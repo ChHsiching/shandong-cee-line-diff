@@ -1,14 +1,15 @@
 ---
 name: cee-admission-match
-description: 把山东省高考大绿本本科专业与近三年录取线差按专业名语义一一对应，产出带线差与日志的整理表与边界表。年度复用——每年录取数据发布后用本 skill 重跑。
+description: 把山东省高考大绿本本科专业与近三年录取线差按专业名语义一一对应，产出带线差与日志的整理表与边界表。年度复用——每年录取数据发布后用本 skill 重跑（v5：precision-first + 数据质量审计硬门）。
 disable-model-invocation: true
 ---
 
-# 山东省高考录取数据匹配整理（年度复用）
+# 山东省高考录取数据匹配整理（年度复用，v5）
 
 > **单一真相源**：完整设计、列索引、决策依据见
-> `docs/superpowers/specs/2026-06-23-cee-admission-match-design.md`（spec）与
-> `docs/superpowers/plans/2026-06-23-cee-admission-match.md`（plan）。
+> `docs/superpowers/specs/2026-06-23-cee-admission-match-design.md`（spec，v5）与
+> `docs/superpowers/plans/2026-06-23-cee-admission-match.md`（iteration-1）+
+> `docs/superpowers/plans/2026-06-23-cee-admission-match-iter2.md`（iteration-2）。
 > 本 skill 是年度执行的浓缩；与 spec/plan 冲突时以 spec/plan 为准。
 
 ## 何时使用
@@ -24,6 +25,20 @@ disable-model-invocation: true
 - **范围**：仅 提前批 + 常规批一段、仅本科；专科全排除（小标题含「专科」即弃）。
 - **一段线**：2023=443 / 2024=444 / 2025=441（`constants.ONE_LINE`）。
 - **输出不覆盖大绿本原列**：行尾追加 J/T/日志 3 列。
+- **precision-first（v5 核心，spec V5-0）**：只有严格精确构造的匹配才算「确定」；
+  **所有判断型匹配**（粗筛自动接受 + agent 语义匹配）**必须经二次 agent 复核**
+  （`semantic-match/RUN_VERIFY.md` 派发 `verify_*_result.jsonl`）。verdict=确定 留主表；
+  verdict=存疑 → J/T 置空 + 日志「复核存疑：<原因>」，下放特殊表。**存疑→特殊，不留在主表**。
+  主表零错配是完成硬门（经复核后主表只含「严格精确 + 复核确定」）。
+- **精度 2 位（spec V5-6）**：所有**新算**的值（line_diff + estimate）舍入 2 位；
+  matched 行保留源值（不改写）；`stage2_apply` 按 2 位对齐比较。
+- **T 策略（spec V5-1）**：
+  - 单年历史匹配：T 留空 + 日志追加「(单年数据，无标准差)」（三处 stage 锚点）。
+  - 新增估算：J 与 T 同时给——退化 0 = 同校同选科历史 J/T 均值（T 排除 None）；
+    退化 1 = 同校全专业 J/T 均值；退化 2 = value=None，T=None。
+- **数据质量审计硬门（spec V5-3，年度复用前必跑）**：宣告「完成」前必须对**真实产出 xlsx**
+  跑 `python -m scripts.audit_output`，**exit 0 才算完成**（pytest 全绿 ≠ 产出正确）。
+  陷阱 B：合成 fixture 全绿但真实产出字段映射错位 → 必须真实源审计。
 
 ## 管线阶段（确定性脚本 + harness 侧 agent）
 
@@ -69,6 +84,18 @@ disable-model-invocation: true
   至多一行；reason 非空 ≤30 字。违反抛 `Stage2ContractError`（带 file:line）。
 - 六要素差异化：核心名 / 性别 / 合作 / 校区 / 方向 / 招生类别；选科非差异化；忽略色盲等。
 
+### Stage 2.5 判断型二次复核（harness 侧 agent，v5 precision-first / spec V5-0）
+
+- **所有判断型匹配**（粗筛自动接受 + Stage2 agent 语义，约 5500 条）**必须经二次 agent 复核**
+  才能留主表——只有严格精确构造的匹配算「确定」。
+- `scripts/verify_judgment.py`（`build_verify_batches` + `write_prompts`）产批次 prompt；
+  harness 按 `semantic-match/RUN_VERIFY.md` 派发 agent → `verify_*_result.jsonl`
+  （`{src_row_idx, verdict ∈ {确定, 存疑}, reason}`）。
+- `run_pipeline --with-agent-results` 在 `_build_main_results` 之前 `apply_verify`：
+  verdict=确定 → 保留主表；verdict=存疑 → idx 从 coarse/semantic/classified 剔除，
+  自然落 `remaining_unmatched → 特殊表`，日志「复核存疑：<原因>」（绕过 generic 兜底）。
+- **契约**：verdict 越界 / 缺字段 / src_row_idx 重复 → 拒。主表经复核后零判断型错配。
+
 ### Stage 3 边界
 
 - **新增专业估算**（逐级退化）：
@@ -112,11 +139,52 @@ disable-model-invocation: true
    `run_pipeline.SOURCE_FILES`）。
 2. 更新 `constants.ONE_LINE`（新年份一段线）+ `tests/baseline_hashes.py`（三源 SHA256）。
 3. `.venv/bin/python -m scripts.run_pipeline`（确定性链，不调 agent）。
-4. harness 侧：`semantic-match/RUN.md` 派发 Stage2 agent；`research/RUN_RENAME.md`
-   派发改名检测 + 网查。
-5. `run_pipeline --with-agent-results` 回填最终主表 + 边界表。
+4. harness 侧：`semantic-match/RUN.md` 派发 Stage2 agent；`semantic-match/RUN_VERIFY.md`
+   派发**判断型二次复核**（v5：粗筛 + 语义全部须复核，~5500 条 ÷ 20 ≈ 275 批）；
+   `research/RUN_RENAME.md` 派发改名检测 + 网查。
+5. `run_pipeline --with-agent-results` 回填最终主表 + 边界表（apply Stage2 + 复核 + 改名）。
+6. **审计硬门（年度复用前必跑，spec V5-3）**：
 
-**完成判据**：`output/` 下 8 张表齐全；`.venv/bin/python -m pytest` 全绿且覆盖率 ≥80%、`ruff check` 无错；三源 SHA256 不变；每个本科专业行 100% 归类（匹配/新增/被删/特殊/改名五类之一）；改名表备注已填（网查或人工）。
+   ```bash
+   .venv/bin/python -m scripts.audit_output \
+       --output-dir output --data-dir data \
+       --intermediate-dir intermediate --semantic-dir semantic-match
+   # 必须 exit 0 才算完成（陷阱 B：pytest 全绿 ≠ 真实产出正确）
+   ```
+
+   或一键端到端验收（v5 Slice D）：`.venv/bin/python -m scripts.run_iter2_acceptance`
+   （重跑管线 + 审计，exit 0 即过；可作 `pytest -m manual` 单点跑）。
+
+**完成判据（v5）**：
+- `output/` 下 8 张表齐全；`.venv/bin/python -m pytest` 全绿且覆盖率 ≥80%、`ruff check` 无错。
+- **数据质量审计 exit 0**（主表零错配[判断型经复核确定] / 0 空日志 / 0 全空行 /
+  字段映射回归 / J-T 一致[精度区分]）。
+- 三源 SHA256 不变；每个本科专业行 100% 归类（匹配/新增/被删/特殊/改名五类之一）。
+- 精度 ≤2 位（新算舍入；matched 保留源值）；新增估算 (J,T) 齐；单年 T 空+日志；
+  专科全排除；改名表备注已填（网查或人工）。
+
+## 数据质量审计硬门（v5 spec V5-3）
+
+**完成前必跑**——pytest 全绿 ≠ 产出正确（陷阱 B：合成 fixture 全绿但真实产出字段映射错位）。
+宣告「完成」前必须对**真实产出 xlsx** 跑审计脚本，**exit 0 才算完成门**：
+
+```bash
+.venv/bin/python -m scripts.audit_output \
+    --output-dir output --data-dir data \
+    --intermediate-dir intermediate --semantic-dir semantic-match
+```
+
+五检查（`scripts/audit_output.py`）：
+
+| # | 检查 | 说明 |
+|---|------|------|
+| 0 | 复核覆盖完备性 | 主表每个判断型匹配行（粗筛/语义日志）的 src_row_idx 必须出现在 `verify_*_result.jsonl` 且 verdict=确定；jsonl 缺失 → fail「复核未派发」 |
+| 1 | 每本科专业行匹配日志非空 | 0 缺失 |
+| 2 | 每张产出表 0 全空数据行 | 分层/扁平/新增/被删/改名/新增校/停招消失/特殊 |
+| 3 | 字段映射回归 | 所有产出表含至少 1 行数据（writer header 锁定在 test_output_quality） |
+| 4 | J/T 一致性（精度区分） | matched 行比近三年源值；新增估算行比 `round(估算,2)`（容差 0.011） |
+
+副作用产物 `output/audit_sample.xlsx`（随机 30 条主表行）供人工语义核验，**不计 exit 0**。
 
 ## 关键常量速查
 
@@ -134,3 +202,7 @@ disable-model-invocation: true
 | Stage2 契约违反 | 看 `Stage2ContractError` 的 file:line，修该 jsonl 行后重跑 `--with-agent-results` |
 | 匹配率远低于 77% | 检查归一化（校名类别剥离/忽略类括号）是否漏 case；核心名粗筛口径 |
 | 被删数异常大 | 改名 agent 未跑（被删为上界）；先跑改名检测排除改名校 |
+| 审计 `judgmental_coverage` FAIL「复核未派发」 | `semantic-match/verify_*_result.jsonl` 缺失；按 `RUN_VERIFY.md` 派发判断型二次复核后重跑 |
+| 审计 `judgmental_coverage` FAIL verdict≠确定 | 主表判断型行未全部判「确定」；查示例 idx，复核存疑者已下放特殊则正常（重审 idx 是否漏 demote） |
+| 审计 `jt_consistency` FAIL | matched 比源值不等 → 修 Stage2 jsonl J/T；新增估算不等 → 查 estimate round(2) |
+| 审计 `no_empty_rows` / `tables_nonempty` FAIL | 字段映射回归（陷阱 A）：查 writer 是否把字段名映射到表头列名 |
