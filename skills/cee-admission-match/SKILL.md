@@ -154,6 +154,10 @@ disable-model-invocation: true
 
    或一键端到端验收（v5 Slice D）：`.venv/bin/python -m scripts.run_iter2_acceptance`
    （重跑管线 + 审计，exit 0 即过；可作 `pytest -m manual` 单点跑）。
+7. **产出报告文档** `output/数据整理报告.md`（markdown）：讲清各表格作用、相互关系、
+   匹配阶段分布、关键口径（线差/精度/T 策略/precision-first/选科非差异化）、列说明、
+   年度复用入口。**不赘述也不精简**——目的是让他人一眼看懂这套表格。以现有报告为模板，
+   用 audit + 逐表统计的真实当年数字填充。
 
 **完成判据（v5）**：
 - `output/` 下 8 张表齐全；`.venv/bin/python -m pytest` 全绿且覆盖率 ≥80%、`ruff check` 无错。
@@ -162,6 +166,7 @@ disable-model-invocation: true
 - 三源 SHA256 不变；每个本科专业行 100% 归类（匹配/新增/被删/特殊/改名五类之一）。
 - 精度 ≤2 位（新算舍入；matched 保留源值）；新增估算 (J,T) 齐；单年 T 空+日志；
   专科全排除；改名表备注已填（网查或人工）。
+- **`output/数据整理报告.md` 已生成**（表格关系/作用/口径/阶段分布，基于真实当年数字）。
 
 ## 数据质量审计硬门（v5 spec V5-3）
 
