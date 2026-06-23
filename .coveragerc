@@ -2,6 +2,7 @@
 branch = False
 omit =
     scripts/models.py
+    scripts/write_edge_tables.py
 
 [report]
 exclude_lines =
