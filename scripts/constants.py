@@ -105,3 +105,7 @@ LOG_GONE_SCHOOL = "学校未在 2026 招生"
 LOG_FLIGHT_UNMATCHED = "飞行技术(军队)，提前批池匹配不成"
 LOG_SPECIAL_UNMATCHED = "特殊情况：未匹配，见特殊情况表"
 LOG_ZHUANKE_OUT_OF_SCOPE = "专科：不在本次整理范围（仅本科）"
+
+# V5-0 second-pass verification (iteration-2 Slice B): prefix injected into
+# special-table EdgeRows for存疑 verdicts demoted out of the main table.
+LOG_VERIFY_DEMOTE_PREFIX = "复核存疑"

@@ -1,0 +1,25 @@
+{
+  "_doc": "Golden pairs for V5-0 judgmental-match second-pass verification regression. Each entry is a (大绿本判断型匹配, expected verdict) that a human pre-confirmed. After agent dispatch (harness side; see semantic-match/RUN_VERIFY.md), the main session asserts >=95% certainty threshold AND that the 投资学(量化投资) counter-example judges 存疑. This file is NOT consumed by CI (test_verify_golden_certainty_threshold is @pytest.mark.manual and skips). Real values are filled in during the main session once verify_*_result.jsonl exist; the schema below is the contract.",
+  "threshold_certainty": 0.95,
+  "pairs": [
+    {
+      "school": "山东大学",
+      "school_cat": "",
+      "dagluben_major": "投资学",
+      "matched_candidate_major": "投资学",
+      "prior_stage": "粗筛匹配：核心名唯一",
+      "expected_verdict": "确定",
+      "dimension": "同名同方向，核心名唯一"
+    },
+    {
+      "school": "<反例校>",
+      "school_cat": "",
+      "dagluben_major": "投资学(量化投资)",
+      "matched_candidate_major": "投资学",
+      "prior_stage": "粗筛匹配：核心名唯一",
+      "expected_verdict": "存疑",
+      "dimension": "方向不同：量化投资≠投资学（V5-0 核心反例）",
+      "_note": "这是 grilling 决策的核心反例 —— 核心名唯一会误匹配带方向的裸名，必须判存疑。"
+    }
+  ]
+}

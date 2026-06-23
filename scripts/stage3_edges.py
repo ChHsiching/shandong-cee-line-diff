@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Sequence, TypedDict
 
-from scripts.constants import LOG_DELETED, LOG_FLIGHT_UNMATCHED
+from scripts.constants import LOG_DELETED, LOG_FLIGHT_UNMATCHED, LOG_VERIFY_DEMOTE_PREFIX
 from scripts.models import DaglubenRow, HistoryRow
 
 __all__ = [
@@ -136,6 +136,7 @@ def deleted_majors(
 def flight_and_special(
     flight_unmatched: Sequence[DaglubenRow],
     other_unmatched: Sequence[DaglubenRow],
+    demoted_map: dict[int, str] | None = None,
 ) -> list[EdgeRow]:
     """Route flight(军队) and remaining-unmatched大绿本 rows to the特殊表.
 
@@ -149,6 +150,11 @@ def flight_and_special(
         Remaining大绿本 rows that survived Stage 1/1.5/2 + new-major + rename
         classification without a home — unclassifiable edge cases. Log:
         ``无法匹配：<原因>``.
+    demoted_map
+        Plan v2 阻断2: ``{src_row_idx: reason}`` for rows the V5-0 second-pass
+        verification judged存疑. Such rows carry log ``复核存疑：<原因>``
+        (bypassing the generic ``无法匹配`` fallback so the special table
+        explains *why* the main-table match was rejected).
 
     Returns
     -------
@@ -158,31 +164,42 @@ def flight_and_special(
         (src_row_idx / school / major / core / subject / batch) for human
         review.
     """
+    demoted_map = demoted_map or {}
     out: list[EdgeRow] = []
     for d in flight_unmatched:
+        idx = d.get("src_row_idx", 0)
+        if idx in demoted_map:
+            log = f"{LOG_VERIFY_DEMOTE_PREFIX}：{demoted_map[idx]}"
+        else:
+            log = LOG_FLIGHT_UNMATCHED
         out.append(
             EdgeRow(
-                src_row_idx=d.get("src_row_idx", 0),
+                src_row_idx=idx,
                 school=d.get("school", ""),
                 school_cat=d.get("school_cat", ""),
                 major=d.get("major", ""),
                 core=d.get("core", ""),
                 subject=d.get("subject", ""),
                 batch=d.get("batch", ""),
-                log=LOG_FLIGHT_UNMATCHED,
+                log=log,
             )
         )
     for d in other_unmatched:
+        idx = d.get("src_row_idx", 0)
+        if idx in demoted_map:
+            log = f"{LOG_VERIFY_DEMOTE_PREFIX}：{demoted_map[idx]}"
+        else:
+            log = f"无法匹配：剩余未归类({d.get('core', '') or d.get('major', '')})"
         out.append(
             EdgeRow(
-                src_row_idx=d.get("src_row_idx", 0),
+                src_row_idx=idx,
                 school=d.get("school", ""),
                 school_cat=d.get("school_cat", ""),
                 major=d.get("major", ""),
                 core=d.get("core", ""),
                 subject=d.get("subject", ""),
                 batch=d.get("batch", ""),
-                log=f"无法匹配：剩余未归类({d.get('core', '') or d.get('major', '')})",
+                log=log,
             )
         )
     return out

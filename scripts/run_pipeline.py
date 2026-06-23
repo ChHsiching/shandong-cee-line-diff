@@ -248,6 +248,8 @@ def _build_main_results(
     semantic_results: list[MatchResult],
     new_major_estimates: dict[int, EstimateResult],
     renamed_dgl_schools: set[str],
+    *,
+    classified_idx: set[int] | None = None,
 ) -> list[MatchResult]:
     """Assemble the final per-row MatchResult list, one entry per大绿本 row.
 
@@ -255,17 +257,27 @@ def _build_main_results(
     semantic. Unmatched results never claim a slot. Rows that survived all
     matchers pick up the new-major estimate (if any) or the rename-pending
     marker (if their school is a confirmed rename).
+
+    ``classified_idx`` (Plan v2 阻断2) optionally overrides the classified
+    set — the V5-0 demote step shrinks it (drops存疑 idx) BEFORE this build so
+    demoted rows fall naturally into the unmatched / special bucket. When
+    ``None`` it is derived from the matched results as usual.
     """
     by_idx: dict[int, MatchResult] = {}
 
+    # When the V5-0 demote step passes an explicit classified set, only
+    # classified idx may claim a matched slot (存疑 idx were stripped upstream
+    # and must fall through to the unmatched bucket).
+    allowed = classified_idx
+
     for r in strict_results:
-        if r.get("matched"):
+        if r.get("matched") and (allowed is None or r["src_row_idx"] in allowed):
             by_idx.setdefault(r["src_row_idx"], r)
     for r in coarse_results:
-        if r.get("matched"):
+        if r.get("matched") and (allowed is None or r["src_row_idx"] in allowed):
             by_idx.setdefault(r["src_row_idx"], r)
     for r in semantic_results:
-        if r.get("matched"):
+        if r.get("matched") and (allowed is None or r["src_row_idx"] in allowed):
             by_idx.setdefault(r["src_row_idx"], r)
 
     # Remaining rows: new-major estimate or rename-pending marker.
@@ -478,8 +490,59 @@ def run(
         out_dir / "停招消失校表.xlsx",
     )
 
+    # --- V5-0 second-pass verification apply (Plan v2 阻断2) ----------------
+    # If verify_*_result.jsonl exists, apply verdicts BEFORE _build_main_results:
+    # filter 存疑 idx out of coarse/semantic results + classified_idx so they
+    # fall naturally into remaining_unmatched → special, carrying a
+    # 「复核存疑：<原因>」 log (bypassing the generic fallback).
+    verify_result_paths = sorted(semantic_dir.glob("verify_*_result.jsonl"))
+    verdict_by_idx: dict[int, str] = {}
+    demoted_map: dict[int, str] = {}
+    coarse_for_main = coarse_results
+    semantic_for_main = semantic_results
+    classified_for_main: set[int] | None = None
+    verify_applied = False
+    if with_agent_results and verify_result_paths:
+        from scripts.verify_judgment import apply_verify, filter_demoted
+        judgmental = [r for r in (coarse_results + semantic_results)]
+        verify_out = apply_verify(verify_result_paths, dagluben, judgmental)
+        verdict_by_idx = verify_out["verdict_by_idx"]
+        # reasons map: pull the reason from the demoted EdgeRows (built by apply_verify).
+        reasons = {e["src_row_idx"]: e["log"].split("：", 1)[1] if "：" in e.get("log", "") else ""
+                   for e in verify_out["demoted"]}
+        coarse_for_main, _, _ = filter_demoted(
+            coarse_results, set(), verdict_by_idx, reasons,
+        )
+        semantic_for_main, _, _ = filter_demoted(
+            semantic_results, set(), verdict_by_idx, reasons,
+        )
+        # Build the classified set from the filtered results (so存疑 idx drop).
+        classified_for_main = (
+            {r["src_row_idx"] for r in strict_results if r.get("matched")}
+            | {r["src_row_idx"] for r in coarse_for_main}
+            | {r["src_row_idx"] for r in semantic_for_main if r.get("matched")}
+            | {d["src_row_idx"] for d in new_majors}
+            | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
+        )
+        demoted_map = {idx: reasons.get(idx, "") for idx, v in verdict_by_idx.items() if v == "存疑"}
+        verify_applied = True
+        logger.info(
+            "复核: 已应用 %d 条复核结果（%d 确定，%d 存疑→特殊）",
+            len(verdict_by_idx),
+            sum(1 for v in verdict_by_idx.values() if v == "确定"),
+            len(demoted_map),
+        )
+    else:
+        if verify_result_paths:
+            logger.info("复核: 检测到 verify_*_result.jsonl 但未启用 --with-agent-results，跳过 apply")
+        else:
+            logger.info(
+                "复核: 未发现 verify_*_result.jsonl，判断型复核 待 harness 派发"
+                "（见 semantic-match/RUN_VERIFY.md）"
+            )
+
     # Flight + remaining-unmatched → special.
-    classified_idx = (
+    classified_idx = classified_for_main if classified_for_main is not None else (
         {r["src_row_idx"] for r in strict_results if r.get("matched")}
         | {r["src_row_idx"] for r in coarse_results}
         | {r["src_row_idx"] for r in semantic_results if r.get("matched")}
@@ -491,13 +554,14 @@ def run(
     ]
     flight = [d for d in remaining_unmatched if d.get("batch") == FLIGHT_BATCH]
     other = [d for d in remaining_unmatched if d.get("batch") != FLIGHT_BATCH]
-    special_rows = flight_and_special(flight, other)
+    special_rows = flight_and_special(flight, other, demoted_map=demoted_map)
     write_special_table(special_rows, out_dir / "特殊情况.xlsx")
 
     # --- Outputs (hierarchical + flat, same MatchResult source) ------------
     main_results = _build_main_results(
-        dagluben, strict_results, coarse_results, semantic_results,
+        dagluben, strict_results, coarse_for_main, semantic_for_main,
         new_major_estimates, renamed_dgl_schools,
+        classified_idx=classified_for_main,
     )
     dl_path = data_dir / SOURCE_FILES["dl"]
     write_hierarchical(
@@ -547,6 +611,9 @@ def run(
         "coverage": coverage,
         "stage2_applied": stage2_applied,
         "rename_applied": rename_applied,
+        "verify_applied": verify_applied,
+        "verdict_by_idx": verdict_by_idx,
+        "demoted_map": demoted_map,
         "renamed_dgl_schools": renamed_dgl_schools,
     }
 
