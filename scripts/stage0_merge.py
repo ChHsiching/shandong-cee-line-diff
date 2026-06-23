@@ -1,14 +1,16 @@
 """Stage 0 — build the unified history table and the大绿本本科专业表.
 
-Slice 1 scope: regular-batch one-segment (常规批一段线) only. Early-batch
-(提前批) is added in Slice 2; the broader unified history table is assembled
-there.
+Slice 1: regular-batch one-segment (常规批一段线) builder + 大绿本 regular-batch
+builder. Slice 2: early-batch supplement (提前批) builder + unified history
+assembly (常规批一段 + 提前批).
 
-Two pure builders:
-    build_history_regular(rows)  -> list[HistoryRow]
+Pure builders:
+    build_history_regular(rows)  -> list[HistoryRow]   (常规批一段线, J/T 已算好)
+    build_history_early(rows)    -> list[HistoryRow]   (本科提前批 A+B, 现场算 J/T)
+    build_unified_history(j3, tq) -> list[HistoryRow]  (前两者拼接)
     build_dagluben_regular(rows) -> list[DaglubenRow]
 
-Both accept workbook rows as produced by ``openpyxl.iter_rows(values_only=True)``
+All accept workbook rows as produced by ``openpyxl.iter_rows(values_only=True)``
 (header row included). Source files are read-only — these functions never touch
 the original workbooks; callers pass already-parsed rows.
 """
@@ -34,13 +36,23 @@ from scripts.constants import (
     J3_STAT_LINE_DIFF,
     J3_STDDEV,
     J3_SUBJECT,
+    ONE_LINE,
+    TQ_BATCH_EARLY,
+    TQ_BATCH_EARLY_A,
+    TQ_BATCH_EARLY_B,
+    TQ_LOW_2023,
+    TQ_LOW_2024,
+    TQ_LOW_2025,
     ZHUANKE_KEYWORD,
 )
+from scripts.line_diff import compute as compute_line_diff
 from scripts.models import DaglubenRow, HistoryRow
 from scripts.normalize import core_of, nfk, split_school, strip_ignore_brackets
 
 __all__ = [
     "build_history_regular",
+    "build_history_early",
+    "build_unified_history",
     "build_dagluben_regular",
     "write_history_csv",
     "write_dagluben_csv",
@@ -116,6 +128,85 @@ def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
             )
         )
     return out
+
+
+# --- 提前批 supplement columns (constants re-anchored here for readability) -
+TQ_BATCH = 0       # 批次名称
+TQ_CATEGORY = 1    # 招生类别 (B 列) — the differentiated admission track
+TQ_SCHOOLNAME = 3  # 院校名称 (D 列)
+TQ_MAJORNAME = 5   # 专业名称 (F 列)
+TQ_SUBJECT = 6     # 选科 (G 列)
+
+
+def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
+    """Build the提前批 history pool from the supplement table.
+
+    Keeps本科提前批 A类 + B类 (spec §3: AB 无差别, 合并), drops专科提前批
+    (193 rows). J/T are computed on the fly from per-year 录取低分
+    (2025→idx10, 2024→idx14, 2023→idx18) minus the one-line cutoff
+    (constants.ONE_LINE) via :func:`line_diff.compute`.
+
+    The招生类别 comes from column B (supplement-table semantics), which differs
+    from 近三年 where it is split off the校名 bracket; the supplement table
+    never embeds category in 院校名称 (verified: 0/1707 rows). Both feeds funnel
+    into the same ``school_cat`` field so the strict matcher can key on it
+    uniformly.
+    """
+    early_batches: frozenset[str] = frozenset({TQ_BATCH_EARLY_A, TQ_BATCH_EARLY_B})
+    out: list[HistoryRow] = []
+    for row in rows:
+        if _is_header(row):
+            continue
+        batch = _cell(row, TQ_BATCH)
+        if batch not in early_batches:
+            continue  # 专科提前批 and anything else dropped
+
+        school_raw = _cell(row, TQ_SCHOOLNAME) or ""
+        school, _embedded_cat = split_school(school_raw)
+        # Category comes from the招生类别 column, not the校名 bracket.
+        cat_raw = nfk(_cell(row, TQ_CATEGORY) or "")
+        major_raw = _cell(row, TQ_MAJORNAME) or ""
+        major = nfk(major_raw)
+        stripped = strip_ignore_brackets(major_raw)
+        core = nfk(core_of(major_raw))
+        subject = nfk(_cell(row, TQ_SUBJECT) or "")
+
+        lows = {
+            2025: _to_float(_cell(row, TQ_LOW_2025)),
+            2024: _to_float(_cell(row, TQ_LOW_2024)),
+            2023: _to_float(_cell(row, TQ_LOW_2023)),
+        }
+        j, t = compute_line_diff(lows, ONE_LINE)
+
+        out.append(
+            HistoryRow(
+                school=school,
+                school_cat=cat_raw,
+                major=major,
+                stripped=stripped,
+                core=core,
+                subject=subject,
+                J=j,
+                T=t,
+                source_table=TQ_BATCH_EARLY,
+            )
+        )
+    return out
+
+
+def build_unified_history(
+    j3_rows: Iterable[Sequence],
+    tq_rows: Iterable[Sequence],
+) -> list[HistoryRow]:
+    """Concatenate常规批一段 + 提前批 into the unified history pool (spec §4.1).
+
+    Order is regular-first then early so any future deduplication (not needed
+    in Slice 2 — the two feeds have disjoint source batches) keeps the
+    larger, pre-computed regular pool as the canonical side.
+    """
+    regular = build_history_regular(j3_rows)
+    early = build_history_early(tq_rows)
+    return [*regular, *early]
 
 
 def build_dagluben_regular(rows: Iterable[Sequence]) -> list[DaglubenRow]:
