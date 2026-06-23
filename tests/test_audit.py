@@ -102,6 +102,26 @@ def _good_output_dir(tmp_path: Path) -> Path:
         ["src_row_idx", "学校", "招生类别", "专业", "核心名", "选科", "批次", "日志"],
         [[5, "他大学", "", "其他", "其他", "物理", "4.常规批", "无法匹配：剩余未归类"]],
     )
+    _write_edge(
+        out / "被删旧专业.xlsx",
+        ["学校", "招生类别", "专业", "近三年统计线差", "近三年线差标准差", "日志"],
+        [["他大学", "", "旧专业", 40.0, 3.0, "近三年有、2026 大绿本无"]],
+    )
+    _write_edge(
+        out / "学校改名表.xlsx",
+        ["2026新校名", "候选旧校名", "置信度", "2026本科专业数", "备注", "人工已核验"],
+        [["新校", "旧校", 0.9, 5, "前身旧校", False]],
+    )
+    _write_edge(
+        out / "新增校表.xlsx",
+        ["2026新校名", "2026本科专业数", "日志"],
+        [["全新校", 3, "2026 新增校，近三年无招生"]],
+    )
+    _write_edge(
+        out / "停招消失校表.xlsx",
+        ["历史旧校名", "日志"],
+        [["消失校", "学校未在 2026 招生"]],
+    )
     return out
 
 
@@ -220,7 +240,7 @@ def test_check1_fails_on_blank_log(tmp_path: Path) -> None:
     # Corrupt the flat output: blank the log on one major row.
     wb = openpyxl.load_workbook(out / "大绿本_附线差_扁平版.xlsx")
     ws = wb.active
-    ws.cell(row=2, column=15, value=None)
+    ws.cell(row=2, column=15).value = None
     wb.save(out / "大绿本_附线差_扁平版.xlsx")
     wb.close()
 
@@ -290,16 +310,22 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
+    # Supply history directly (avoids rebuilding from a fixture data dir); the
+    # strict row is school=示例大学, major=计算机, J=60.0 in history.
+    history = [
+        {"school": "示例大学", "major": "计算机", "J": 60.0, "T": 5.0},
+        {"school": "示例大学", "major": "数学", "J": 70.0, "T": None},
+    ]
     # Corrupt the strict row's J to a value that disagrees with history (60.0).
     wb = openpyxl.load_workbook(out / "大绿本_附线差_分层版.xlsx")
     ws = wb.active
-    ws.cell(row=2, column=13, value=999.0)
+    ws.cell(row=2, column=13).value = 999.0
     wb.save(out / "大绿本_附线差_分层版.xlsx")
     wb.close()
 
     report = audit(
         out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        history=history, semantic_dir=sem,
     )
     assert report.ok is False
     c4 = next(c for c in report.checks if c["name"].startswith("jt_consistency"))
@@ -307,18 +333,20 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
 
 
 def test_check4_estimate_row_uses_round_tolerance(tmp_path: Path) -> None:
-    """V5-6 precision split: 新增估算 rows are compared against
-    round(estimate, 2), not source history. A small rounding drift within the
-    estimate column must NOT trip check 4."""
+    """V5-6 precision split: 新增估算 rows are compared against the value in
+    新增专业.xlsx (the estimate table is ground truth), not source history.
+    The good fixture's estimate row (J=80.0) matches the estimate table → pass."""
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
-    # The new-major row's J in the main table is 80.0; keep it consistent.
-    # (Good fixture already passes; this test documents the precision policy.)
+    history = [
+        {"school": "示例大学", "major": "计算机", "J": 60.0, "T": 5.0},
+        {"school": "示例大学", "major": "数学", "J": 70.0, "T": None},
+    ]
     report = audit(
         out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        history=history, semantic_dir=sem,
     )
     c4 = next(c for c in report.checks if c["name"].startswith("jt_consistency"))
     assert c4["passed"] is True, c4
