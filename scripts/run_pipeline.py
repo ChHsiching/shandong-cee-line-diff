@@ -198,6 +198,49 @@ def _apply_rename(
     return [], set(), False
 
 
+def _research_summary(text: str, school: str) -> str:
+    """Concise remark from a research/<school>.md note (Task 6.3 websearch).
+
+    Prefer the richest conclusion line (判定 段: 前身/更名/原名/...), skipping
+    query-statement and source-URL lines that also contain those keywords."""
+    skip = ("查询语句", "来源URL", "来源", "查询")
+    concl = ("前身", "更名", "原名", "转设", "合并", "升格", "揭牌", "教育部", "由")
+    cands = []
+    for line in text.splitlines():
+        s = line.strip().lstrip("-").lstrip("#").strip()
+        if not s or any(k in s[:8] for k in skip):
+            continue
+        if any(k in s for k in concl):
+            cands.append(s)
+    if cands:
+        return max(cands, key=len)[:100]
+    for line in text.splitlines():
+        s = line.strip().lstrip("-").lstrip("#").strip()
+        if s and not any(k in s[:8] for k in skip):
+            return s[:100]
+    return f"（见 research/{school}.md）"
+
+
+def _enrich_rename_rows(
+    rename_rows: list, dagluben: list, research_dir: str = "research",
+) -> None:
+    """Populate ``major_count_2026`` + websearch ``remark`` on rename rows
+    (spec §6 Task 6.3) before the学校改名表 is written. apply_rename returns
+    RenameRows without these fields."""
+    cnt = collections.Counter(
+        d.get("school", "") for d in dagluben if d.get("school")
+    )
+    rdir = Path(research_dir)
+    for r in rename_rows:
+        ns = r.get("new_school", "")
+        r["major_count_2026"] = cnt.get(ns, 0)
+        md = rdir / f"{ns}.md"
+        if md.exists():
+            r["remark"] = _research_summary(md.read_text(encoding="utf-8"), ns)
+        else:
+            r.setdefault("remark", f"（见 research/{ns}.md）")
+
+
 def _build_main_results(
     dagluben: list[DaglubenRow],
     strict_results: list[MatchResult],
@@ -385,6 +428,7 @@ def run(
     rename_rows, renamed_dgl_schools, rename_applied = _apply_rename(
         dagluben, history, semantic_dir, with_agent_results,
     )
+    _enrich_rename_rows(rename_rows, dagluben)
     write_rename_table(rename_rows, out_dir / "学校改名表.xlsx")
 
     # --- Stage 3 (edges: deleted / flight / special) -----------------------

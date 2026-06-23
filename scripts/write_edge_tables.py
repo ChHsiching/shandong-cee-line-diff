@@ -224,8 +224,24 @@ def write_rename_table(
 ) -> None:
     """Write ``学校改名表.xlsx`` (spec §7). The ``备注`` column holds the
     web-search summary (Task 6.3) and ``manual_reviewed`` is surfaced as a
-    boolean column ``人工已核验`` so humans can see which备注 are curated."""
-    _write_simple_table(_RENAME_HEADER, rename_rows, out_path, "学校改名表")
+    boolean column ``人工已核验`` so humans can see which备注 are curated.
+
+    RenameRow fields (new_school/old_school/confidence/major_count_2026/remark/
+    manual_reviewed) are remapped to the header column names —
+    ``_write_simple_table`` looks cells up by header name, so passing RenameRow
+    directly left every cell empty (field name ≠ header name)."""
+    rows = [
+        {
+            "2026新校名": r.get("new_school", ""),
+            "候选旧校名": r.get("old_school") or "",
+            "置信度": r.get("confidence", ""),
+            "2026本科专业数": r.get("major_count_2026", 0),
+            "备注": r.get("remark") or "",
+            "人工已核验": bool(r.get("manual_reviewed", False)),
+        }
+        for r in rename_rows
+    ]
+    _write_simple_table(_RENAME_HEADER, rows, out_path, "学校改名表")
 
 
 # --- 新增校表 (未配对的大绿本独有校) ----------------------------------------

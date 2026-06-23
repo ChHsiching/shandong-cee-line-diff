@@ -69,8 +69,8 @@ def test_write_deleted_major_table_empty(tmp_path: Path) -> None:
 
 def test_write_rename_table_has_manual_reviewed_column(tmp_path: Path) -> None:
     rows = [
-        {"2026新校名": "新大学", "候选旧校名": "旧大学", "置信度": 0.9,
-         "2026本科专业数": 5, "备注": "", "人工已核验": False},
+        {"new_school": "新大学", "old_school": "旧大学", "confidence": 0.9,
+         "major_count_2026": 5, "remark": "", "manual_reviewed": False},
     ]
     out = tmp_path / "学校改名表.xlsx"
     write_rename_table(rows, out)
@@ -86,6 +86,29 @@ def test_write_rename_table_empty(tmp_path: Path) -> None:
     out = tmp_path / "学校改名表.xlsx"
     write_rename_table([], out)
     assert len(_load(out)) == 1
+
+
+def test_write_rename_table_maps_field_names_to_columns(tmp_path: Path) -> None:
+    """Regression: real RenameRow fields (new_school/old_school/...) must map to
+    header columns (2026新校名/候选旧校名/...). Previously write_rename_table
+    passed RenameRow straight to _write_simple_table, whose record.get(header)
+    lookup missed every field (header name ≠ field name) → empty cells."""
+    rows = [
+        {"new_school": "新大学", "old_school": "旧大学", "confidence": 0.9,
+         "is_rename": True, "major_count_2026": 5,
+         "remark": "网查：2026由旧大学更名", "manual_reviewed": False},
+    ]
+    out = tmp_path / "学校改名表.xlsx"
+    write_rename_table(rows, out)
+    data = _load(out)
+    assert data[0] == ("2026新校名", "候选旧校名", "置信度",
+                       "2026本科专业数", "备注", "人工已核验")
+    assert data[1][0] == "新大学"          # 2026新校名 ← new_school
+    assert data[1][1] == "旧大学"          # 候选旧校名 ← old_school
+    assert data[1][2] == 0.9              # 置信度 ← confidence
+    assert data[1][3] == 5                # 2026本科专业数 ← major_count_2026
+    assert data[1][4] == "网查：2026由旧大学更名"  # 备注 ← remark
+    assert data[1][5] is False            # 人工已核验 ← manual_reviewed
 
 
 # ---------------------------------------------------------------------------
