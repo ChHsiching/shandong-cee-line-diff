@@ -183,18 +183,20 @@ def test_estimate_returns_typed_dict_with_all_fields() -> None:
 
 def test_estimate_level0_returns_T_same_school_same_subject_average() -> None:
     # 退化0: T = mean of compatible history rows' T (excludes T=None rows).
+    # Note: J-mean uses all compatible rows that have a J (3 here); T-mean
+    # only uses the rows whose T is not None (2 here). n is the J sample size.
     new_major = _dagluben("示例大学", "物理和化学")
     history = [
-        _hist("示例大学", "物理 | 物理和化学", 80.0, t=10.0),  # compatible, has T
-        _hist("示例大学", "物理和化学和生物", 100.0, t=20.0),  # compatible, has T
-        _hist("示例大学", "物理 | 物理和化学", 90.0, t=None),  # compatible but no T (excluded)
+        _hist("示例大学", "物理 | 物理和化学", 80.0, t=10.0),  # compatible, has J and T
+        _hist("示例大学", "物理和化学和生物", 100.0, t=20.0),  # compatible, has J and T
+        _hist("示例大学", "物理 | 物理和化学", 90.0, t=None),  # compatible J, no T (T-excluded)
         _hist("示例大学", "历史", 50.0, t=999.0),              # not compatible
     ]
     result = estimate(new_major, history)
     assert result["level"] == 0
-    assert result["value"] == 90.0  # mean(80, 100)
+    assert result["value"] == round((80.0 + 100.0 + 90.0) / 3, 2)
     assert result["T"] == 15.0       # mean(10, 20) — excludes None row
-    assert result["n"] == 2
+    assert result["n"] == 3
 
 
 def test_estimate_level0_T_none_when_all_compatible_rows_lack_T() -> None:

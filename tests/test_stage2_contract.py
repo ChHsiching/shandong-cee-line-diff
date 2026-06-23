@@ -379,3 +379,44 @@ def test_golden_pair_hit_rate() -> None:
         "golden regression runs in the main session after agent dispatch; "
         "see semantic-match/RUN.md"
     )
+
+
+# --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
+
+SINGLE_YEAR_NOTE_STAGE2 = "（单年数据，无标准差）"
+
+
+def test_apply_results_single_year_history_adds_no_stddev_note(tmp_path: Path) -> None:
+    """A semantic match whose matched history row has T=None must append the
+    「(单年数据，无标准差)」note to the log (V5-1)."""
+    # History row with T=None (single-year data — stddev undefined).
+    dagluben = [_dl(1, "甲大学", "计算机类(图灵)", "计算机类")]
+    history = [
+        HistoryRow(
+            school="甲大学", school_cat="", major="计算机类(网络)",
+            stripped="计算机类(网络)", core="计算机类", subject="物理",
+            J=78.0, T=None, source_table="常规批一段线",
+        ),
+    ]
+    line = json.dumps(
+        {
+            "src_row_idx": 1, "school": "甲大学", "major": "计算机类(图灵)",
+            "match": "计算机类(网络)", "J": 78.0, "T": None,
+            "reason": "方向对齐",
+        },
+        ensure_ascii=False,
+    )
+    jsonl = _write(tmp_path, [line])
+    results = apply_results([jsonl], dagluben, history)
+    assert results[0]["matched"] is True
+    assert results[0]["T"] is None
+    assert SINGLE_YEAR_NOTE_STAGE2 in results[0]["log"]
+
+
+def test_apply_results_multi_year_history_does_not_add_note(tmp_path: Path) -> None:
+    """A semantic match whose history row carries a T must NOT get the note."""
+    dagluben, history = _fixtures()  # _hist sets T=1.0
+    jsonl = _write(tmp_path, [_line(1, "计算机类(网络)", "方向对齐", 78.0, 1.0)])
+    results = apply_results([jsonl], dagluben, history)
+    assert results[0]["matched"] is True
+    assert SINGLE_YEAR_NOTE_STAGE2 not in results[0]["log"]

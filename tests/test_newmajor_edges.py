@@ -129,15 +129,18 @@ def test_mark_newmajor_in_main_level2_keeps_j_empty() -> None:
 def test_write_new_major_table_writes_estimate_and_level_and_log(
     tmp_path: Path,
 ) -> None:
+    # V5-1: the table also carries the 线差标准差估算 column (T), sourced from
+    # the record's "T" key (EstimateResult["T"]). It may be None (level 2 or
+    # no compatible T) but the column and value must round-trip.
     rows = [
         {
             "school": "示例大学", "major": "人工智能", "subject": "物理和化学",
-            "value": 80.0, "level": 0, "n": 2,
+            "value": 80.0, "T": 12.5, "level": 0, "n": 2,
             "log": "新增专业：估算=同校同选科(2)均值=80.0",
         },
         {
             "school": "全新大学", "major": "量子信息", "subject": "物理和化学",
-            "value": None, "level": 2, "n": 0,
+            "value": None, "T": None, "level": 2, "n": 0,
             "log": "新校/无历史，无法估算",
         },
     ]
@@ -150,8 +153,9 @@ def test_write_new_major_table_writes_estimate_and_level_and_log(
     wb.close()
 
     header = all_rows[0]
-    # 关键列必须存在。
+    # 关键列必须存在 (V5-1: 线差标准差估算 新增).
     assert "统计线差估算" in header
+    assert "线差标准差估算" in header
     assert "退化级别" in header
     assert "样本量" in header
     assert "日志" in header
@@ -159,8 +163,10 @@ def test_write_new_major_table_writes_estimate_and_level_and_log(
     data = all_rows[1:]
     assert len(data) == 2
     assert data[0][header.index("统计线差估算")] == 80.0
+    assert data[0][header.index("线差标准差估算")] == 12.5
     assert data[0][header.index("退化级别")] == 0
     assert data[1][header.index("统计线差估算")] is None
+    assert data[1][header.index("线差标准差估算")] is None
     assert data[1][header.index("退化级别")] == 2
 
 

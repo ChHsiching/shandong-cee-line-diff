@@ -32,6 +32,26 @@ def test_build_main_results_emits_log_for_unmatched_special() -> None:
     assert LOG_SPECIAL_UNMATCHED in out[0]["log"]
 
 
+def test_build_main_results_new_major_carries_estimate_T() -> None:
+    """V5-1 / Plan v2 阻断1: a 新增专业 row's T must come from the estimate,
+    not a hardcoded None. The estimate's value (J) and T are both surfaced."""
+    from scripts.models import EstimateResult
+
+    dagluben = [
+        DaglubenRow(src_row_idx=7, school="Y大学", school_cat="普通计划",
+                    major="新专业Z", batch="4.常规批"),
+    ]
+    estimates = {
+        7: EstimateResult(value=88.0, T=13.5, level=0, n=2, log="估算log"),
+    }
+    out = _build_main_results(dagluben, [], [], [], estimates, set())
+    assert len(out) == 1
+    assert out[0]["src_row_idx"] == 7
+    assert out[0]["J"] == 88.0
+    assert out[0]["T"] == 13.5  # from estimate, NOT hardcoded None
+    assert out[0]["log"] == "估算log"
+
+
 def test_write_flat_excludes_zhuanke_major_rows(tmp_path: Path) -> None:
     """扁平版 must omit 专科 专业行 (小标题含「专科」); scope is 仅本科."""
     src = tmp_path / "src.xlsx"

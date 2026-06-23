@@ -117,6 +117,41 @@ def test_match_strict_uses_history_dagluben_cat_mapping():
     assert results[0]["J"] == 50.0
 
 
+# --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
+
+SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+
+
+def test_match_strict_single_year_history_adds_no_stddev_note():
+    """A strict match whose history row has T=None must append the
+    「(单年数据，无标准差)」note to the log (V5-1)."""
+    history = [
+        _hist(school="S大学", school_cat="", stripped="数学", J=55.0, T=None),
+    ]
+    dagluben = [
+        _dl(school="S大学", school_cat="普通计划", stripped="数学",
+            src_row_idx=1),
+    ]
+    results = stage1_strict.match_strict(dagluben, history)
+    assert results[0]["matched"] is True
+    assert results[0]["T"] is None
+    assert SINGLE_YEAR_NOTE in results[0]["log"]
+
+
+def test_match_strict_multi_year_history_does_not_add_note():
+    """A strict match whose history row carries a T must NOT get the note."""
+    history = [
+        _hist(school="M大学", school_cat="", stripped="数学", J=55.0, T=7.3),
+    ]
+    dagluben = [
+        _dl(school="M大学", school_cat="普通计划", stripped="数学",
+            src_row_idx=1),
+    ]
+    results = stage1_strict.match_strict(dagluben, history)
+    assert results[0]["matched"] is True
+    assert SINGLE_YEAR_NOTE not in results[0]["log"]
+
+
 # --- Real-workbook smoke: ~57.8% strict hit rate ---------------------------
 
 class TestStage1Smoke:

@@ -354,3 +354,51 @@ class TestStage1_5Smoke:
         rate = total_auto / len(dl)
         # Plan: 74.4% observed; allow 72%-78% band.
         assert 0.72 <= rate <= 0.78, f"cumulative auto rate {rate:.4f} outside 72%-78%"
+
+
+# --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
+
+SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+
+
+def test_match_coarse_unique_single_year_history_adds_no_stddev_note():
+    """A coarse unique-candidate match whose history row has T=None must
+    append the「(单年数据，无标准差)」note (V5-1)."""
+    history = [_hist(school="A大学", school_cat="", core="数学",
+                     major="数学", J=60.0, T=None)]
+    idx = stage1_5_coarse.build_core_idx(history)
+    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)",
+                    src_row_idx=1)]
+    accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
+    assert len(accepted) == 1
+    assert accepted[0]["T"] is None
+    assert SINGLE_YEAR_NOTE in accepted[0]["log"]
+
+
+def test_match_coarse_disambig_single_year_history_adds_no_stddev_note():
+    """A coarse bracket-disambig match whose chosen candidate has T=None must
+    append the note (exercises the disambig accept path, not just unique)."""
+    history = [
+        _hist(school="A大学", school_cat="", core="数学",
+              major="数学(男)", J=60.0, T=None),
+        _hist(school="A大学", school_cat="", core="数学",
+              major="数学(女)", J=55.0, T=None),
+    ]
+    idx = stage1_5_coarse.build_core_idx(history)
+    dagluben = [_dl(school="A大学", core="数学", major="数学(男)",
+                    src_row_idx=1)]
+    accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
+    assert len(accepted) == 1
+    assert SINGLE_YEAR_NOTE in accepted[0]["log"]
+
+
+def test_match_coarse_multi_year_history_does_not_add_note():
+    """A coarse match whose candidate carries a T must NOT get the note."""
+    history = [_hist(school="A大学", school_cat="", core="数学",
+                     major="数学", J=60.0, T=4.2)]
+    idx = stage1_5_coarse.build_core_idx(history)
+    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)",
+                    src_row_idx=1)]
+    accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
+    assert len(accepted) == 1
+    assert SINGLE_YEAR_NOTE not in accepted[0]["log"]
