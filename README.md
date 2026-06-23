@@ -6,57 +6,47 @@
 ## 安装 / 下载本 skill
 
 本仓库既是数据整理工具，也是 `cee-admission-match` skill 的下载源。
-Skill 采用 Anthropic 开放格式（SKILL.md），**Claude Code、OpenAI Codex、VS Code Copilot、Cursor、zcode 等 AI coding agent 均原生支持**（[SKILL.md 开放模式](https://bibek-poudel.medium.com/the-skill-md-pattern-how-to-write-ai-agent-skills-that-actually-work-72a3169dd7ee)）。
+Skill 采用开放格式（SKILL.md），各 AI coding agent 均原生支持。
 
 ### Claude Code
 
-**方式1：clone 仓库（推荐，含代码 + skill + 目录结构）**
+```bash
+git clone git@github.com:ChHsiching/cee-admission-data.git
+# 方式1：含代码+skill+目录结构（推荐）
+cd cee-admission-data && python3 -m venv .venv && .venv/bin/pip install pytest openpyxl ruff pytest-cov
+# 方式2：仅装 skill
+cp -r skills/cee-admission-match ~/.claude/skills/
+```
+
+### ZCode（智谱）
+
+ZCode skill 目录为 `~/.zcode/skills/`（[官方文档](https://zcode.z.ai/cn/docs/skill)）。
 
 ```bash
 git clone git@github.com:ChHsiching/cee-admission-data.git
-cd cee-admission-data
-python3 -m venv .venv && .venv/bin/pip install pytest openpyxl ruff pytest-cov
+cp -r cee-admission-data/skills/cee-admission-match ~/.zcode/skills/
 ```
 
-**方式2：仅安装 skill（复制到 ~/.claude/skills/）**
+或直接在 ZCode 桌面应用中：**设置 → 技能 → 导入** → 自动扫描 Claude Code 的 skill 目录 → 一键导入（支持软链/复制）。
 
-```bash
-git clone git@github.com:ChHsiching/cee-admission-data.git
-cp -r cee-admission-data/skills/cee-admission-match ~/.claude/skills/
-```
+聊天中调用：输入 `$` → 选 `cee-admission-match`，或 `$cee-admission-match 帮我整理 data/ 下的数据`。
 
 ### OpenAI Codex
 
-Codex 已采用 Anthropic 开放 skill 格式，SKILL.md 开箱即用（[官方文档](https://developers.openai.com/codex/skills)）。
-
-**方式1：Skill Installer（推荐）**——在 Codex CLI 中输入 `$`，选择 Skill Installer，
-粘贴仓库 URL：`github.com/ChHsiching/cee-admission-data`。
-
-**方式2：手动安装**——clone 后复制 skill 目录到 Codex skills 路径。
-
-### zcode / 其他 SKILL.md 兼容 agent
-
-zcode 及任何支持 SKILL.md 开放格式的 AI coding agent（VS Code Copilot、Cursor、Kilo Code 等）均可使用本 skill。安装方式通用：
-
 ```bash
-# 1. clone 仓库
-git clone git@github.com:ChHsiching/cee-admission-data.git
-
-# 2. 复制 skill 到你的 agent 的 skills 目录
-#    （各 agent 路径不同，参考其文档；常见路径如下）
-cp -r cee-admission-data/skills/cee-admission-match <agent-skills-dir>/
-#    Claude Code:  ~/.claude/skills/
-#    Codex:        ~/.codex/skills/ 或项目 .codex/skills/
-#    VS Code:      ~/.vscode/skills/ 或扩展设置
-#    zcode:        参考 zcode 文档的 skills 路径
-
-# 3. 在 agent 中调用
-#    Skill("cee-admission-match") 或直接提及「山东高考/大绿本/线差」让 skill 自动触发
+# 在 Codex CLI 中输入 $，选择 Skill Installer，粘贴仓库 URL：
+github.com/ChHsiching/cee-admission-data
 ```
 
-> **如果你的 agent 不支持 SKILL.md 格式**：将 `skills/cee-admission-match/SKILL.md` +
-> `REFERENCE.md` 的内容复制到该 agent的自定义指令文件（如 `AGENTS.md` / `.cursorrules` /
-> `CLAUDE.md`）中，作为项目级指令使用。
+### 其他 agent（OpenCode / Cursor / VS Code Copilot 等）
+
+用 [npx skills](https://skillsmp.com) 工具安装：
+
+```bash
+npx skills add ChHsiching/cee-admission-data
+```
+
+或手动 clone 后复制 `skills/cee-admission-match/` 到你的 agent 的 skills 目录。
 
 ### 使用
 
