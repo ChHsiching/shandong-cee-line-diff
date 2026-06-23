@@ -21,6 +21,8 @@ output/*
 !output/.gitkeep
 semantic-match/*
 !semantic-match/.gitkeep
+!semantic-match/prompt.md
+!semantic-match/RUN.md
 research/*
 !research/.gitkeep
 
