@@ -183,7 +183,9 @@ def test_match_coarse_multi_candidate_still_unmatched_when_ambiguous():
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 0
     assert len(still) == 1
-    assert still[0]["matched"] is False
+    # still_unmatched returns the original DaglubenRow, not a MatchResult.
+    assert still[0]["school"] == "中国人民大学"
+    assert still[0]["src_row_idx"] == 12
 
 
 def test_match_coarse_multi_candidate_two_compatible_still_unmatched():

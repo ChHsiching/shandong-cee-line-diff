@@ -87,3 +87,9 @@ IGNORE_BRACKET_KEYWORDS: tuple[str, ...] = (
 
 # --- Match log strings (spec §9) ------------------------------------------
 LOG_STRICT = "严格匹配：归一化专业名+招生类别一致"
+
+# Stage 1.5 core-name coarse match logs (spec §9 粗筛 + Plan v2 binding).
+# Task spec overrides the generic「签名唯一对齐」wording with two specific logs.
+LOG_COARSE_UNIQUE = "粗筛匹配：核心名唯一"
+LOG_COARSE_DISAMBIG_PREFIX = "粗筛匹配：括号子集消歧"
+LOG_SUBJECT_DRIFT = "选科政策漂移，已忽略"
