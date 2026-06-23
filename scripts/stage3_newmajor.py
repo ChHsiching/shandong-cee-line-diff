@@ -101,12 +101,38 @@ def _level0_value(
     return statistics.fmean(js), len(js)
 
 
+def _level0_T(new_major: DaglubenRow, school_history: list[HistoryRow]) -> float | None:
+    """Mean of T over same-school, kit-compatible history rows that have a T.
+
+    Rows whose T is None are excluded (V5-1). Returns None if no compatible
+    row carries a T.
+    """
+    new_subject = new_major.get("subject", "")
+    ts = [
+        h["T"]
+        for h in school_history
+        if h.get("T") is not None
+        and select_kit_compatible(new_subject, h.get("subject", ""))
+    ]
+    if not ts:
+        return None
+    return statistics.fmean(ts)
+
+
 def _level1_value(school_history: list[HistoryRow]) -> tuple[float | None, int]:
     """Mean of J over all same-school history rows that have a J."""
     js = [h["J"] for h in school_history if h.get("J") is not None]
     if not js:
         return None, 0
     return statistics.fmean(js), len(js)
+
+
+def _level1_T(school_history: list[HistoryRow]) -> float | None:
+    """Mean of T over all same-school history rows that have a T (V5-1)."""
+    ts = [h["T"] for h in school_history if h.get("T") is not None]
+    if not ts:
+        return None
+    return statistics.fmean(ts)
 
 
 def _fmt_value(v: float) -> str:
@@ -132,28 +158,39 @@ def estimate(
     Returns
     -------
     EstimateResult
-        ``{value, level, log, n}`` per Plan v2 binding. ``level`` is 0/1/2.
+        ``{value, T, level, log, n}`` per Plan v2 binding + V5-1. ``level`` is
+        0/1/2. J (``value``) and T are each the mean over their degradation
+        level's rows (T excludes rows whose T is None), rounded to 2 decimals
+        (V5-6). At level 2 both are None.
     """
     school = new_major_row.get("school", "")
     same_school = [h for h in school_history if h.get("school") == school]
 
     # 退化2: 整校无历史.
     if not same_school:
-        return EstimateResult(value=None, level=2, n=0, log="新校/无历史，无法估算")
+        return EstimateResult(
+            value=None, T=None, level=2, n=0, log="新校/无历史，无法估算",
+        )
 
     # 退化0: 同校 + 选科集合包含.
     value0, n0 = _level0_value(new_major_row, same_school)
     if value0 is not None:
         value0 = round(value0, 2)  # 舍入 2 位，匹配近三年源精度。
+        t0 = _level0_T(new_major_row, same_school)
+        t0 = round(t0, 2) if t0 is not None else None  # V5-6: T 也 round 2。
         log = f"新增专业：估算=同校同选科({n0})均值={_fmt_value(value0)}"
-        return EstimateResult(value=value0, level=0, n=n0, log=log)
+        return EstimateResult(value=value0, T=t0, level=0, n=n0, log=log)
 
     # 退化1: 同校无同选科 (或兼容行全无 J) → 同校全专业均值.
     value1, n1 = _level1_value(same_school)
     if value1 is not None:
         value1 = round(value1, 2)  # 舍入 2 位，匹配近三年源精度。
+        t1 = _level1_T(same_school)
+        t1 = round(t1, 2) if t1 is not None else None  # V5-6: T 也 round 2。
         log = f"新增专业：退化=同校全专业均值(无同选科)({n1})={_fmt_value(value1)}"
-        return EstimateResult(value=value1, level=1, n=n1, log=log)
+        return EstimateResult(value=value1, T=t1, level=1, n=n1, log=log)
 
     # 同校历史行存在但全部 J=None → 仍无法估算，记 level2 口径.
-    return EstimateResult(value=None, level=2, n=0, log="新校/无历史，无法估算")
+    return EstimateResult(
+        value=None, T=None, level=2, n=0, log="新校/无历史，无法估算",
+    )

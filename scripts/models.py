@@ -57,9 +57,16 @@ class MatchResult(TypedDict, total=False):
 
 
 class EstimateResult(TypedDict, total=False):
-    """Result of新增专业 estimation (Stage 3, Slice 5)."""
+    """Result of新增专业 estimation (Stage 3, Slice 5).
 
-    value: float | None
+    Per V5-1 (iteration-2): carries **both** J (``value``) and T (``T``) —
+    each is the mean over the matching degradation level's history rows,
+    with T computed only over rows that actually carry a T (rows whose T is
+    None are excluded; if no compatible row has a T, T is None).
+    """
+
+    value: float | None     # 统计线差估算 (J)
+    T: float | None         # 线差标准差估算 (V5-1)
     level: int              # 0 同校同选科 / 1 同校全专业 / 2 整校无历史
     log: str
     n: int                  # 样本量

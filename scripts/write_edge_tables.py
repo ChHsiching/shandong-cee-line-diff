@@ -119,9 +119,12 @@ def mark_newmajor_in_main(
     return out
 
 
-# 新增专业.xlsx columns. 统计线差估算 may be None (level 2); 退化级别 0/1/2.
+# 新增专业.xlsx columns. 统计线差估算 / 线差标准差估算 may be None
+# (level 2 / no compatible T); 退化级别 0/1/2.
 _NEW_MAJOR_HEADER: tuple[str, ...] = (
-    "学校", "专业", "选科", "统计线差估算", "退化级别", "样本量", "日志",
+    "学校", "专业", "选科",
+    "统计线差估算", "线差标准差估算",
+    "退化级别", "样本量", "日志",
 )
 
 # Map record dict keys (from write_new_major_table input) to header labels.
@@ -130,6 +133,7 @@ _NEW_MAJOR_KEY_TO_HEADER = {
     "major": "专业",
     "subject": "选科",
     "value": "统计线差估算",
+    "T": "线差标准差估算",
     "level": "退化级别",
     "n": "样本量",
     "log": "日志",
@@ -139,7 +143,12 @@ _NEW_MAJOR_KEY_TO_HEADER = {
 def write_new_major_table(
     new_majors_with_estimate: list[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``新增专业.xlsx`` with estimate value, level, sample size, log.
+    """Write ``新增专业.xlsx`` with estimate value, T, level, sample size, log.
+
+    Columns: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 退化级别 /
+    样本量 / 日志. The 统计线差估算 and 线差标准差估算 columns come directly
+    from the EstimateResult (V5-1 — T is estimated alongside J; either may be
+    None at level 2 or when no compatible row carries a T).
 
     Idempotent: overwrites any existing file at ``out_path``. An empty input
     still produces a header-only workbook so downstream tooling can rely on
@@ -158,6 +167,7 @@ def write_new_major_table(
             record.get("major", ""),
             record.get("subject", ""),
             record.get("value"),
+            record.get("T"),
             record.get("level"),
             record.get("n"),
             record.get("log", ""),

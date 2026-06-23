@@ -296,7 +296,7 @@ def _build_main_results(
                 major=d.get("major", ""),
                 matched=False,
                 J=est.get("value"),
-                T=None,
+                T=est.get("T"),
                 log=est.get("log", ""),
             )
         else:
@@ -430,6 +430,7 @@ def run(
             "major": d.get("major", ""),
             "subject": d.get("subject", ""),
             "value": est.get("value"),
+            "T": est.get("T"),
             "level": est.get("level"),
             "n": est.get("n"),
             "log": est.get("log", ""),
