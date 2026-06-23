@@ -222,12 +222,14 @@ def test_run_excludes_zhuanke_rows(fixture_workbooks, tmp_path):
 
 
 def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
-    """For every专业 row present in both outputs, J/T/log must match.
+    """For every专业 row present in both outputs, J/T + the 5 structured
+    columns must match.
 
     Both outputs are written from the same MatchResult list, so every (school,
-    major) pair that appears in both must carry an identical J/T/log triple.
-    We key by (school, major) rather than row position because the flat output
-    omits non-major rows and so its row positions do not align with the
+    major) pair that appears in both must carry an identical row-end 7-tuple
+    (J, T, 匹配阶段, 单年数据, 选科漂移, 复核结果, 原因备注). We key by
+    (school, major) rather than row position because the flat output omits
+    non-major rows and so its row positions do not align with the
     hierarchical output's.
     """
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
@@ -241,6 +243,7 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
     hier = _read_output_major_rows(hier_path)
     flat = _read_output_major_rows(flat_path)
 
+    row_end_keys = ("J", "T") + _OUTPUT_STRUCTURED_HEADERS
     flat_by_key = {(r["school"], r["major"]): r for r in flat}
     mismatches: list[str] = []
     for h in hier:
@@ -248,10 +251,11 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
         f = flat_by_key.get(key)
         if f is None:
             continue
-        if (h["J"], h["T"], h["log"]) != (f["J"], f["T"], f["log"]):
+        h_end = tuple(h[k] for k in row_end_keys)
+        f_end = tuple(f[k] for k in row_end_keys)
+        if h_end != f_end:
             mismatches.append(
-                f"{key}: hier=({h['J']},{h['T']},{h['log']!r}) "
-                f"flat=({f['J']},{f['T']},{f['log']!r})"
+                f"{key}: hier={h_end!r} flat={f_end!r}"
             )
     assert not mismatches, "hierarchical/flat diverged:\n" + "\n".join(mismatches)
 
@@ -524,13 +528,17 @@ def _materialize_sources(fixture_workbooks, tmp_path):
 
 _OUTPUT_HEADER_J = "近三年统计线差"
 _OUTPUT_HEADER_T = "近三年线差标准差"
-_OUTPUT_HEADER_LOG = "匹配日志"
+# iteration-3: the legacy single「匹配日志」column was split into 5 structured
+# columns. We read all 5 by header name so a column re-order cannot silently
+# break the hierarchical-vs-flat consistency check.
+_OUTPUT_STRUCTURED_HEADERS = (
+    "匹配阶段", "单年数据", "选科漂移", "复核结果", "原因备注",
+)
 
 
 def _read_output_major_rows(path: Path) -> list[dict]:
-    """Read an output workbook and return its专业 rows with J/T/log + the
-    original src_row_idx (re-derived from the flat row position for the flat
-    output, and from the workbook row index for the hierarchical output).
+    """Read an output workbook and return its专业 rows with J/T + the 5
+    structured columns + the original src_row_idx.
 
     For the hierarchical output the src_row_idx is the openpyxl 1-based row
     number (matching the大绿本 source layout). For the flat output, we cannot
@@ -542,11 +550,10 @@ def _read_output_major_rows(path: Path) -> list[dict]:
     rows = list(ws.iter_rows(values_only=True))
     wb.close()
     header = rows[0]
-    # Locate the J/T/log columns by header (positions 13/14/15 in 1-based,
-    # but find robustly in case of future column shifts).
+    # Locate columns by header (robust against future column shifts).
     j_idx = header.index(_OUTPUT_HEADER_J)
     t_idx = header.index(_OUTPUT_HEADER_T)
-    log_idx = header.index(_OUTPUT_HEADER_LOG)
+    structured_idx = {h: header.index(h) for h in _OUTPUT_STRUCTURED_HEADERS}
     # Original columns: 代号(E=idx4) 名称(F=idx5) 学校(D=idx3).
     out: list[dict] = []
     for row_idx_1based, row in enumerate(rows, start=1):
@@ -556,12 +563,16 @@ def _read_output_major_rows(path: Path) -> list[dict]:
         name = row[5] if len(row) > 5 else None
         if not code or not name:
             continue
+        structured = {
+            h: (row[idx] if idx < len(row) else None)
+            for h, idx in structured_idx.items()
+        }
         out.append({
             "src_row_idx": row_idx_1based,
             "school": row[3],
             "major": name,
             "J": row[j_idx] if j_idx < len(row) else None,
             "T": row[t_idx] if t_idx < len(row) else None,
-            "log": row[log_idx] if log_idx < len(row) else None,
+            **structured,
         })
     return out

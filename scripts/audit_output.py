@@ -5,25 +5,27 @@ declared "done", the **real produced xlsx** (not just pytest) must pass five
 checks. The audit reads the produced xlsx + the verification jsonl and returns
 an :class:`AuditReport`; :func:`main` exits 0 iff ``ok=True``.
 
-Checks (Plan v2 Slice C 修订):
-  0  judgmental_coverage — every judgmental-match row in the hierarchical
-     output (logs starting with coarse / semantic prefixes per V5-0) must
-     appear in ``verify_*_result.jsonl`` with verdict=确定. Missing jsonl
-     entirely → fail with「复核未派发」.
-  1  nonempty_log — every 本科 major row in the flat output carries a
-     non-empty 匹配日志 (0 缺失).
+iteration-3 (structured-columns, Plan v2 CRITICAL扩范围): every check that
+previously inspected the legacy「匹配日志」cell now keys off the structured
+「匹配阶段」column **by name** (not index, not the log string). This removes
+the duplicated JUDGMENTAL_LOG_PREFIXES copy and survives column re-ordering.
+
+Checks:
+  0  judgmental_coverage — every row whose 匹配阶段 ∈ {粗筛匹配, 语义匹配} in
+     the hierarchical output must appear in ``verify_*_result.jsonl`` with
+     verdict=确定. Missing jsonl entirely → fail with「复核未派发」.
+  1  nonempty_stage — every 本科 major row in the flat output carries a
+     non-empty 匹配阶段 (0 缺失).
   2  no_empty_rows — every produced table has zero fully-blank data rows.
   3  tables_nonempty — every produced table has at least one data row
-     (field-mapping regression guard; the writer-level header lock lives in
-     test_output_quality).
+     (field-mapping regression guard).
   4  jt_consistency — random ≥30 matched rows' J/T agree with the source
-     近三年 values (matched rows) or with the round(estimate, 2) value (新增
-     rows). Precision-aware: matched rows use a tight tolerance against source
-     history; 新增 rows use the estimate table as ground truth.
+     近三年 values (matched rows) or with the estimate table (新增 rows).
+     Matched = 匹配阶段 ∈ {严格匹配, 粗筛匹配, 语义匹配}; estimate = 匹配阶段
+     == 新增专业.
 
 A side artefact ``audit_sample.xlsx`` is written for human semantic review; it
-does NOT influence ``ok`` / the exit code (Plan v2 Slice C 修订: 语义抽样 →
-``@manual`` 不计 exit 0).
+does NOT influence ``ok`` / the exit code.
 """
 
 from __future__ import annotations
@@ -38,12 +40,6 @@ from typing import Any, Sequence
 
 import openpyxl
 
-from scripts.constants import (
-    LOG_COARSE_DISAMBIG_PREFIX,
-    LOG_COARSE_UNIQUE,
-    LOG_SEMANTIC_PREFIX,
-    LOG_STRICT,
-)
 from scripts.stage0_merge import build_unified_history
 
 __all__ = [
@@ -51,7 +47,9 @@ __all__ = [
     "AuditCheck",
     "HIER_ARCHICAL_NAME",
     "FLAT_NAME",
-    "JUDGMENTAL_LOG_PREFIXES",
+    "JUDGMENTAL_STAGES",
+    "MATCHED_STAGES",
+    "ESTIMATE_STAGE",
     "audit",
     "main",
 ]
@@ -81,22 +79,21 @@ PRODUCED_TABLES: tuple[str, ...] = (
     GONE_SCHOOL_NAME,
 )
 
-# Logs marking a main-table row as 判断型 (V5-0 — needs second-pass verify).
-# Strict-exact (LOG_STRICT) is构造确定 and excluded. Aligned with
-# verify_judgment.JUDGMENT_LOG_PREFIXES (kept local to avoid an import cycle
-# through verify_judgment → stage3_edges).
-JUDGMENTAL_LOG_PREFIXES: tuple[str, ...] = (
-    LOG_COARSE_UNIQUE,
-    LOG_COARSE_DISAMBIG_PREFIX,
-    LOG_SEMANTIC_PREFIX,
-)
+# iteration-3: stage-based whitelists (replace the old JUDGMENTAL_LOG_PREFIXES
+# copy). The audit reads 匹配阶段 by column NAME, so a future wording tweak in
+# the log constants cannot silently drop a row from a check.
+STAGE_HEADER = "匹配阶段"
+JUDGMENTAL_STAGES: frozenset[str] = frozenset({"粗筛匹配", "语义匹配"})
+MATCHED_STAGES: frozenset[str] = frozenset({"严格匹配", "粗筛匹配", "语义匹配"})
+ESTIMATE_STAGE = "新增专业"
 
-# Column indices in the hierarchical / flat output (1-based).
+# Column indices in the hierarchical / flat output (1-based) — used only for
+# the fixed-position columns (school / major / J / T / code). The structured
+# columns are looked up BY NAME.
 COL_SCHOOL = 4
 COL_MAJOR_NAME = 6
 COL_J = 13
 COL_T = 14
-COL_LOG = 15
 # Major-row detector columns (1-based): 代号(E=5) + 名称(F=6) both non-empty.
 COL_CODE = 5
 
@@ -146,6 +143,22 @@ def _is_major_row(row: tuple) -> bool:
     return code not in (None, "") and name not in (None, "")
 
 
+def _stage_col_index(header: tuple) -> int | None:
+    """Return the 0-based index of the 匹配阶段 column, or None if absent."""
+    for i, h in enumerate(header):
+        if h == STAGE_HEADER:
+            return i
+    return None
+
+
+def _stage_of(row: tuple, stage_idx: int | None) -> str:
+    """Return the row's 匹配阶段 value ("" when column absent or cell empty)."""
+    if stage_idx is None or stage_idx >= len(row):
+        return ""
+    v = row[stage_idx]
+    return "" if v is None else str(v)
+
+
 def _load_verify_verdicts(semantic_dir: Path) -> dict[int, str] | None:
     """Read every ``verify_*_result.jsonl`` under semantic_dir.
 
@@ -165,11 +178,6 @@ def _load_verify_verdicts(semantic_dir: Path) -> dict[int, str] | None:
             idx = obj["src_row_idx"]
             out[idx] = obj["verdict"]
     return out
-
-
-def _judgmental_log(log: str) -> bool:
-    """True iff a main-table log marks the row as 判断型 (needs verify)."""
-    return any(log.startswith(p) for p in JUDGMENTAL_LOG_PREFIXES)
 
 
 def _history_index(
@@ -197,7 +205,8 @@ def _row_fully_blank(row: tuple) -> bool:
 def _check0_judgmental_coverage(
     hier_rows: list[tuple], verdicts: dict[int, str] | None
 ) -> AuditCheck:
-    """Every judgmental-match row's src_row_idx must appear with verdict=确定."""
+    """Every row with 匹配阶段 ∈ {粗筛匹配, 语义匹配} must have verdict=确定
+    in verify_*_result.jsonl."""
     name = "judgmental_coverage"
     if verdicts is None:
         return {
@@ -205,18 +214,22 @@ def _check0_judgmental_coverage(
             "detail": "复核未派发：semantic-match/verify_*_result.jsonl 缺失",
         }
 
+    if not hier_rows:
+        return {"name": name, "passed": True, "detail": "无数据行"}
+
+    header = tuple(h if h is not None else "" for h in hier_rows[0])
+    stage_idx = _stage_col_index(header)
+
     missing: list[int] = []
     wrong_verdict: list[int] = []
     for row_idx_0, row in enumerate(hier_rows):
         src_row_idx = row_idx_0 + 1  # 1-based; header is row 1
         if src_row_idx == 1:
             continue
-        if not _is_major_row(row):
+        if not _is_major_row(tuple(row)):
             continue
-        if len(row) < COL_LOG:
-            continue
-        log = row[COL_LOG - 1] or ""
-        if not _judgmental_log(str(log)):
+        stage = _stage_of(tuple(row), stage_idx)
+        if stage not in JUDGMENTAL_STAGES:
             continue
         v = verdicts.get(src_row_idx)
         if v is None:
@@ -234,27 +247,29 @@ def _check0_judgmental_coverage(
     return {"name": name, "passed": True, "detail": "判断型匹配复核覆盖完备（verdict=确定）"}
 
 
-def _check1_nonempty_log(flat_rows: list[tuple]) -> AuditCheck:
-    """Every 本科 major row in the flat output has a non-empty 匹配日志."""
-    name = "nonempty_log"
+def _check1_nonempty_stage(flat_rows: list[tuple]) -> AuditCheck:
+    """Every 本科 major row in the flat output has a non-empty 匹配阶段."""
+    name = "nonempty_log"  # keep historical check name for report stability
+    if not flat_rows:
+        return {"name": name, "passed": False, "detail": "扁平版无数据行"}
+    header = tuple(h if h is not None else "" for h in flat_rows[0])
+    stage_idx = _stage_col_index(header)
+
     blank: list[int] = []
     for row_idx_0, row in enumerate(flat_rows):
         if row_idx_0 == 0:
             continue  # header
-        if not _is_major_row(row):
+        if not _is_major_row(tuple(row)):
             continue
-        if len(row) < COL_LOG:
-            blank.append(row_idx_0 + 1)
-            continue
-        log = row[COL_LOG - 1]
-        if log is None or str(log).strip() == "":
+        stage = _stage_of(tuple(row), stage_idx)
+        if stage.strip() == "":
             blank.append(row_idx_0 + 1)
     if blank:
         return {
             "name": name, "passed": False,
-            "detail": f"扁平版 {len(blank)} 行匹配日志为空；示例行={blank[:5]}",
+            "detail": f"扁平版 {len(blank)} 行匹配阶段为空；示例行={blank[:5]}",
         }
-    return {"name": name, "passed": True, "detail": "本科专业行匹配日志全部非空"}
+    return {"name": name, "passed": True, "detail": "本科专业行匹配阶段全部非空"}
 
 
 def _check2_no_empty_rows(out_dir: Path) -> AuditCheck:
@@ -309,12 +324,12 @@ def _check4_jt_consistency(
 ) -> AuditCheck:
     """Random ≥30 matched rows' J/T agree with source (precision-aware).
 
-    Matched rows (strict / coarse / semantic logs) are compared against the
-    source近三年 history value at (school, major) with a tight tolerance
+    Matched rows (匹配阶段 ∈ {严格匹配, 粗筛匹配, 语义匹配}) are compared against
+    the source近三年 history value at (school, major) with a tight tolerance
     (handles float display drift; single-year T=None must match None).
 
-    新增估算 rows (LOG startswith「新增专业」) are compared against the value
-    in ``新增专业.xlsx`` at (school, major) — the estimate table is the ground
+    新增估算 rows (匹配阶段 == 新增专业) are compared against the value in
+    ``新增专业.xlsx`` at (school, major) — the estimate table is the ground
     truth for new-major rows (V5-6 precision split).
     """
     name = "jt_consistency"
@@ -330,19 +345,24 @@ def _check4_jt_consistency(
         t = r[4]
         nm_idx[(str(school or ""), str(major or ""))] = (j, t)
 
+    if not hier_rows:
+        return {"name": name, "passed": False, "detail": "分层版无数据行"}
+    header = tuple(h if h is not None else "" for h in hier_rows[0])
+    stage_idx = _stage_col_index(header)
+
     # Collect candidate matched + estimate rows from the hierarchical output.
     matched_candidates: list[tuple] = []
     estimate_candidates: list[tuple] = []
     for row_idx_0, row in enumerate(hier_rows):
         if row_idx_0 == 0:
             continue
-        if not _is_major_row(row) or len(row) < COL_LOG:
+        if not _is_major_row(tuple(row)):
             continue
-        log = str(row[COL_LOG - 1] or "")
-        if log.startswith(LOG_STRICT) or _judgmental_log(log):
-            matched_candidates.append(row)
-        elif log.startswith("新增专业"):
-            estimate_candidates.append(row)
+        stage = _stage_of(tuple(row), stage_idx)
+        if stage in MATCHED_STAGES:
+            matched_candidates.append(tuple(row))
+        elif stage == ESTIMATE_STAGE:
+            estimate_candidates.append(tuple(row))
 
     rng = random.Random(seed)
     sample_matched = rng.sample(
@@ -423,8 +443,8 @@ def _write_sample(hier_rows: list[tuple], out_path: Path, seed: int = 20260623) 
     for i, row in enumerate(hier_rows):
         if i == 0:
             continue
-        if _is_major_row(row):
-            majors.append(row)
+        if _is_major_row(tuple(row)):
+            majors.append(tuple(row))
     rng = random.Random(seed)
     sample = rng.sample(majors, min(SAMPLE_SIZE, len(majors)))
     wb = openpyxl.Workbook()
@@ -485,7 +505,7 @@ def audit(
 
     checks: list[AuditCheck] = []
     checks.append(_check0_judgmental_coverage(hier_rows, verdicts))
-    checks.append(_check1_nonempty_log(flat_rows))
+    checks.append(_check1_nonempty_stage(flat_rows))
     checks.append(_check2_no_empty_rows(out_dir))
     checks.append(_check3_tables_nonempty(out_dir))
 
