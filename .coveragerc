@@ -6,6 +6,7 @@ omit =
     scripts/run_rename_smoke.py
     scripts/run_stage2_prep.py
     scripts/run_stage_verify_prep.py
+    scripts/run_iter2_acceptance.py
 
 [report]
 exclude_lines =
