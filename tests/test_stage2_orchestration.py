@@ -66,11 +66,11 @@ def test_build_batches_groups_by_school_and_attaches_candidates() -> None:
     """3 unmatched rows across 2 schools split into batches of 2.
 
     Asserts:
-      - rows are grouped by school,
-      - each item carries the same-school candidates whose core name matches
-        (基础专业名 pre-filter),
+      - rows are batched in input order with batch_size respected,
+      - each item carries the same-school candidates whose core name is
+        compatible (基础专业名 pre-filter) with THAT dagluben row's core,
       - candidates from *other* schools are NOT attached,
-      - batch_size slicing is respected.
+      - unrelated cores within the same school are NOT attached.
     """
     unmatched = [
         _dl("甲大学", "计算机类(图灵)", "计算机类", 1),
@@ -90,26 +90,27 @@ def test_build_batches_groups_by_school_and_attaches_candidates() -> None:
 
     # batch_size=2 over 3 rows -> 2 batches (sizes 2 and 1).
     assert len(batches) == 2
+    assert [len(b.items) for b in batches] == [2, 1]
     assert sum(len(b.items) for b in batches) == 3
 
-    # All items from 甲大学 should carry its computer+math candidates (chemistry
-    # excluded by core-name pre-filter); 乙大学 carries its physics candidate
-    # only (丙大学 excluded by school).
     all_items = [it for b in batches for it in b.items]
-    by_school = {it.dagluben.school: it for it in all_items}
+    by_idx = {it.dagluben["src_row_idx"]: it for it in all_items}
 
-    jia = by_school["甲大学"]
-    # Two 甲大学 dagluben rows exist (计算机类, 数学类); both share the candidate
-    # set of same-school candidates. Candidate list is the pre-filtered pool for
-    # that school — same pool per item in the school group.
-    jia_candidates_majors = {c["major"] for c in jia.candidates}
-    assert {"计算机类", "计算机类(网络)", "数学类"}.issubset(jia_candidates_majors)
-    assert "化学" not in jia_candidates_majors
-    assert "物理学" not in jia_candidates_majors  # other school
+    # 计算机类 dagluben (idx=1): same-school computer candidates only.
+    cs_item = by_idx[1]
+    assert {c["major"] for c in cs_item.candidates} == {"计算机类", "计算机类(网络)"}
+    assert "化学" not in {c["major"] for c in cs_item.candidates}
+    assert "物理学" not in {c["major"] for c in cs_item.candidates}
 
-    yi = by_school["乙大学"]
-    yi_majors = {c["major"] for c in yi.candidates}
-    assert yi_majors == {"物理学"}
+    # 数学类 dagluben (idx=2): same-school math candidate only (computer
+    # candidates have a different core and are correctly excluded).
+    math_item = by_idx[2]
+    assert {c["major"] for c in math_item.candidates} == {"数学类"}
+
+    # 乙大学 physics dagluben (idx=3): its physics candidate only — 丙大学
+    # is a different school and must NOT leak in.
+    phys_item = by_idx[3]
+    assert {c["major"] for c in phys_item.candidates} == {"物理学"}
 
 
 def test_build_batches_empty_unmatched_returns_empty() -> None:
@@ -192,7 +193,13 @@ def test_write_prompts_preserves_item_order_and_indices(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _result_line(idx: int, match: str | None, j: float | None, reason: str) -> str:
+def _result_line(
+    idx: int,
+    match: str | None,
+    j: float | None,
+    reason: str,
+    t: float | None = 1.0,
+) -> str:
     return json.dumps(
         {
             "src_row_idx": idx,
@@ -200,7 +207,7 @@ def _result_line(idx: int, match: str | None, j: float | None, reason: str) -> s
             "major": "计算机类(图灵)",
             "match": match,
             "J": j,
-            "T": 1.5,
+            "T": t,
             "reason": reason,
         },
         ensure_ascii=False,
@@ -220,7 +227,7 @@ def test_apply_results_backfills_matched_and_null(tmp_path: Path) -> None:
     jsonl = tmp_path / "batch_01_result.jsonl"
     jsonl.write_text(
         _result_line(1, "计算机类", 80.0, "核心名同、方向括号对齐") + "\n"
-        + _result_line(2, None, None, "无对应历史专业") + "\n",
+        + _result_line(2, None, None, "无对应历史专业", None) + "\n",
         encoding="utf-8",
     )
 
@@ -230,7 +237,7 @@ def test_apply_results_backfills_matched_and_null(tmp_path: Path) -> None:
     matched = next(r for r in results if r["src_row_idx"] == 1)
     assert matched["matched"] is True
     assert matched["J"] == 80.0
-    assert matched["T"] == 1.5
+    assert matched["T"] == 1.0
     assert "语义匹配" in matched["log"]
     assert "核心名同、方向括号对齐" in matched["log"]
 
@@ -251,6 +258,8 @@ def test_apply_results_merges_multiple_jsonl(tmp_path: Path) -> None:
     ]
     j1 = tmp_path / "batch_01_result.jsonl"
     j2 = tmp_path / "batch_02_result.jsonl"
+    # Both echo their candidate's T (1.0 from _hist) so the J/T echo contract
+    # passes and the merge itself is what's under test.
     j1.write_text(_result_line(1, "数学", 90.0, "唯一同校候选") + "\n", encoding="utf-8")
     j2.write_text(
         json.dumps(
@@ -260,7 +269,7 @@ def test_apply_results_merges_multiple_jsonl(tmp_path: Path) -> None:
                 "major": "物理",
                 "match": "物理",
                 "J": 60.0,
-                "T": 0.5,
+                "T": 1.0,
                 "reason": "核心名一致",
             },
             ensure_ascii=False,

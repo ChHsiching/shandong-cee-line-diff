@@ -93,3 +93,7 @@ LOG_STRICT = "严格匹配：归一化专业名+招生类别一致"
 LOG_COARSE_UNIQUE = "粗筛匹配：核心名唯一"
 LOG_COARSE_DISAMBIG_PREFIX = "粗筛匹配：括号子集消歧"
 LOG_SUBJECT_DRIFT = "选科政策漂移，已忽略"
+
+# Stage 2 agent semantic-match logs (spec §9 语义).
+LOG_SEMANTIC_PREFIX = "语义匹配"
+LOG_SEMANTIC_NULL_PREFIX = "语义匹配：无对应"
