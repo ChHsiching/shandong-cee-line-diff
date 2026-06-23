@@ -46,14 +46,21 @@ def data_dir(repo_root: Path) -> Path:
 def tmp_xlsx(tmp_path: Path):
     """Factory: write rows (list of list) to a fresh xlsx and return its path.
 
+    Each call produces a uniquely-named file under tmp_path so multiple
+    fixtures in one test never clobber each other.
+
     Usage:
         path = tmp_xlsx([["a", "b"], [1, 2]])
     """
 
     import openpyxl
+    import itertools
+
+    counter = itertools.count()
 
     def _build(rows: list[list], sheet_name: str = "Sheet1") -> Path:
-        path = tmp_path / "fixture.xlsx"
+        n = next(counter)
+        path = tmp_path / f"fixture_{n}.xlsx"
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = sheet_name
