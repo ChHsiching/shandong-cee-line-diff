@@ -2,6 +2,7 @@
 branch = False
 omit =
     scripts/models.py
+    scripts/run_newmajor_smoke.py
 
 [report]
 exclude_lines =
