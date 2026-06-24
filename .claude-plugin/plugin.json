@@ -1,0 +1,10 @@
+{
+  "name": "shandong-cee-line-diff",
+  "version": "1.0.0",
+  "description": "山东高考 CEE 录取数据整理——大绿本招生计划匹配近三年线差，产出带线差/标准差/结构化日志的整理表。Annual reuse; auto-asks 一段线/scope.",
+  "author": { "name": "ChHsiching" },
+  "homepage": "https://github.com/ChHsiching/shandong-cee-line-diff",
+  "repository": "https://github.com/ChHsiching/shandong-cee-line-diff",
+  "license": "MIT",
+  "keywords": ["shandong", "cee", "gaokao", "admission", "line-diff", "大绿本"]
+}

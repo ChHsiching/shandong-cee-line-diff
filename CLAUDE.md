@@ -1,6 +1,6 @@
 # CLAUDE.md — shandong-cee-line-diff
 
-本项目是 `shandong-cee-line-diff` skill 仓库——把山东省高考（CEE）大绿本招生计划与近三年录取线差按专业语义匹配整理成带线差/标准差/结构化日志的表。仓库根 `SKILL.md` 为 skill 入口，`scripts/` 为参考实现；`data/` 下三个原始 xlsx 由用户自行放入（不入库）。
+本项目是 `shandong-cee-line-diff` skill ——一个 **Claude Code plugin**（`.claude-plugin/plugin.json` + `marketplace.json`，内含 1 个 skill），把山东省高考（CEE）大绿本招生计划与近三年录取线差按专业语义匹配整理成带线差/标准差/结构化日志的表。skill 入口 `skills/shandong-cee-line-diff/SKILL.md`，`scripts/` 为参考实现；`data/` 下三个原始 xlsx 由用户自行放入（不入库）。Claude Code 安装：`claude plugin install shandong-cee-line-diff@shandong-cee-line-diff`。
 
 ## 数据资产（项目根目录）
 
