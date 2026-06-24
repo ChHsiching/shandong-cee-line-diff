@@ -352,8 +352,8 @@ class TestStage1_5Smoke:
         strict_hits = len(dl) - len(unmatched_dl)
         total_auto = strict_hits + len(accepted)
         rate = total_auto / len(dl)
-        # Plan: 74.4% observed; allow 72%-78% band.
-        assert 0.72 <= rate <= 0.78, f"cumulative auto rate {rate:.4f} outside 72%-78%"
+        # core_of 嵌套括号修复后核心名更干净→累计率升至 ~79.5%；allow 77%-81% band.
+        assert 0.77 <= rate <= 0.81, f"cumulative auto rate {rate:.4f} outside 77%-81%"
 
 
 # --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------

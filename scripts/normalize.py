@@ -123,9 +123,13 @@ def strip_ignore_brackets(name: str) -> str:
 
 
 def core_of(name: str) -> str:
-    """Strip every括号, leaving only the基础专业名 (core name)."""
+    """Strip every括号, leaving only the基础专业名 (core name). 循环处理嵌套括号（如「1+3(一年国内加三年芬兰)」）。"""
     cleaned = nfk(name)
-    return _BRACKET_RE.sub("", cleaned)
+    prev = None
+    while prev != cleaned:
+        prev = cleaned
+        cleaned = _BRACKET_RE.sub("", cleaned)
+    return cleaned
 
 
 def diff_brackets(name: str) -> list[tuple[str, str]]:
