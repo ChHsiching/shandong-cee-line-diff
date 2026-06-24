@@ -1,6 +1,14 @@
 # Session memory buffer (local only — harness/hook scratch, never commit)
 .remember/
 
+# Raw source data — user-supplied, NEVER commit (sensitive). Only data/README.md ships.
+data/*
+!data/README.md
+
+# Local output backups & derived archives (never commit)
+output_backup_*/
+*.zip
+
 # Python (data analysis: pandas / openpyxl / jupyter)
 __pycache__/
 *.py[cod]

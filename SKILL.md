@@ -1,5 +1,5 @@
 ---
-name: cee-admission-match
+name: shandong-cee-line-diff
 description: 山东高考 CEE 录取数据整理——大绿本招生计划匹配近三年线差。Use when the user provides 山东高考 admission xlsx and wants them matched into a unified table with 线差+标准差+结构化日志列. Annual reuse; auto-asks 一段线/scope.
 ---
 

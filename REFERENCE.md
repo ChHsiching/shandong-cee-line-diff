@@ -1,6 +1,6 @@
 # 管线阶段与参考（REFERENCE）
 
-> 本文件是 `cee-admission-match` skill 的**详细参考**——SKILL.md 自主启动流程执行到具体阶段时按需查阅。
+> 本文件是 `shandong-cee-line-diff` skill 的**详细参考**——SKILL.md 自主启动流程执行到具体阶段时按需查阅。
 
 ## 管线阶段（确定性脚本 + harness 侧 agent）
 

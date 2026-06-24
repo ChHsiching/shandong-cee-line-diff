@@ -1,21 +1,21 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues in **`ChHsiching/cee-admission-data`**. Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live as GitHub issues in **`ChHsiching/shandong-cee-line-diff`**. Use the `gh` CLI for all operations.
 
 > Note: this working directory is not (yet) a git clone of that repo, so `gh`
 > cannot infer the repo from `git remote`. Pass
-> `--repo ChHsiching/cee-admission-data` explicitly (shown below). Once the
+> `--repo ChHsiching/shandong-cee-line-diff` explicitly (shown below). Once the
 > directory is a clone of the repo, `gh` infers the repo automatically and the
 > flag becomes optional.
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --repo ChHsiching/cee-admission-data --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --repo ChHsiching/cee-admission-data --comments`, filtering comments by `jq` and also fetching labels.
-- **List issues**: `gh issue list --repo ChHsiching/cee-admission-data --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Comment on an issue**: `gh issue comment <number> --repo ChHsiching/cee-admission-data --body "..."`
-- **Apply / remove labels**: `gh issue edit <number> --repo ChHsiching/cee-admission-data --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --repo ChHsiching/cee-admission-data --comment "..."`
+- **Create an issue**: `gh issue create --repo ChHsiching/shandong-cee-line-diff --title "..." --body "..."`. Use a heredoc for multi-line bodies.
+- **Read an issue**: `gh issue view <number> --repo ChHsiching/shandong-cee-line-diff --comments`, filtering comments by `jq` and also fetching labels.
+- **List issues**: `gh issue list --repo ChHsiching/shandong-cee-line-diff --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
+- **Comment on an issue**: `gh issue comment <number> --repo ChHsiching/shandong-cee-line-diff --body "..."`
+- **Apply / remove labels**: `gh issue edit <number> --repo ChHsiching/shandong-cee-line-diff --add-label "..."` / `--remove-label "..."`
+- **Close**: `gh issue close <number> --repo ChHsiching/shandong-cee-line-diff --comment "..."`
 
 ## Pull requests as a triage surface
 
@@ -23,8 +23,8 @@ Issues and PRDs for this repo live as GitHub issues in **`ChHsiching/cee-admissi
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue in `ChHsiching/cee-admission-data`.
+Create a GitHub issue in `ChHsiching/shandong-cee-line-diff`.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --repo ChHsiching/cee-admission-data --comments`.
+Run `gh issue view <number> --repo ChHsiching/shandong-cee-line-diff --comments`.

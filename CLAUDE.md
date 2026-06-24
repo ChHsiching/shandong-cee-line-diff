@@ -1,6 +1,6 @@
-# CLAUDE.md — cee-admission-data
+# CLAUDE.md — shandong-cee-line-diff
 
-本项目用于分析山东省高考（CEE）录取与招生数据。非 git 仓库；当前仅有原始数据文件，尚无代码。
+本项目是 `shandong-cee-line-diff` skill 仓库——把山东省高考（CEE）大绿本招生计划与近三年录取线差按专业语义匹配整理成带线差/标准差/结构化日志的表。仓库根 `SKILL.md` 为 skill 入口，`scripts/` 为参考实现；`data/` 下三个原始 xlsx 由用户自行放入（不入库）。
 
 ## 数据资产（项目根目录）
 
@@ -50,7 +50,7 @@
 
 ### Issue tracker
 
-GitHub Issues（`ChHsiching/cee-admission-data`，经 `gh` CLI）；外部 PR **不**作为 triage 面。详见 `docs/agents/issue-tracker.md`。
+GitHub Issues（`ChHsiching/shandong-cee-line-diff`，经 `gh` CLI）；外部 PR **不**作为 triage 面。详见 `docs/agents/issue-tracker.md`。
 
 ### Triage labels
 

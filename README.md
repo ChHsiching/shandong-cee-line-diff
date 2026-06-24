@@ -5,60 +5,58 @@
 
 ## 安装 / 下载本 skill
 
-本仓库既是数据整理工具，也是 `cee-admission-match` skill 的下载源。
-Skill 采用开放格式（SKILL.md），各 AI coding agent 均原生支持。
+本仓库 = `shandong-cee-line-diff` skill 本体（`SKILL.md` 在仓库根，`scripts/`/`tests/` 为参考实现）。安装 =「克隆仓库 → 复制到 agent 的 skills 目录」，装好即是自包含、可直接跑的 skill（不含原始数据，`data/` 由用户自行放入）。
+
+### ZCode（智谱）—— 一条命令
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ChHsiching/shandong-cee-line-diff/main/install.sh | bash
+```
+
+自动：浅克隆仓库 → 复制到 `~/.zcode/skills/shandong-cee-line-diff/`（含 SKILL.md + scripts + tests）→ 删除临时克隆。**任意目录执行即可。**
+
+或用 ZCode 桌面应用：**设置 → 技能 → 导入** → 自动扫描外部 agent 的 skill 目录 → 一键导入（软链/复制）。
+聊天调用：`$shandong-cee-line-diff 帮我整理 data/ 下的山东高考录取数据`（[ZCode skill 文档](https://zcode.z.ai/cn/docs/skill)）。
 
 ### Claude Code
 
 ```bash
-git clone git@github.com:ChHsiching/cee-admission-data.git
-# 方式1：含代码+skill+目录结构（推荐）
-cd cee-admission-data && python3 -m venv .venv && .venv/bin/pip install pytest openpyxl ruff pytest-cov
-# 方式2：仅装 skill
-cp -r skills/cee-admission-match ~/.claude/skills/
+curl -fsSL https://raw.githubusercontent.com/ChHsiching/shandong-cee-line-diff/main/install.sh | bash -s -- --claude
+# 或手动：git clone … && cp -r shandong-cee-line-diff ~/.claude/skills/
 ```
 
-### ZCode（智谱）
-
-ZCode skill 目录为 `~/.zcode/skills/`（[官方文档](https://zcode.z.ai/cn/docs/skill)）。
-
-```bash
-git clone git@github.com:ChHsiching/cee-admission-data.git
-cp -r cee-admission-data/skills/cee-admission-match ~/.zcode/skills/
-```
-
-或直接在 ZCode 桌面应用中：**设置 → 技能 → 导入** → 自动扫描 Claude Code 的 skill 目录 → 一键导入（支持软链/复制）。
-
-聊天中调用：输入 `$` → 选 `cee-admission-match`，或 `$cee-admission-match 帮我整理 data/ 下的数据`。
+调用：`Skill("shandong-cee-line-diff")`。
 
 ### OpenAI Codex
 
-```bash
-# 在 Codex CLI 中输入 $，选择 Skill Installer，粘贴仓库 URL：
-github.com/ChHsiching/cee-admission-data
-```
+Codex CLI 输入 `$` → Skill Installer → 粘贴仓库 URL：`github.com/ChHsiching/shandong-cee-line-diff`。
 
-### 其他 agent（OpenCode / Cursor / VS Code Copilot 等）
-
-用 [npx skills](https://skillsmp.com) 工具安装：
+### 其他 agent（OpenCode / Cursor / Copilot 等）
 
 ```bash
-npx skills add ChHsiching/cee-admission-data
+npx skills add ChHsiching/shandong-cee-line-diff
+# 或：curl … install.sh | bash -s -- --target <你的 skills 目录>
 ```
 
-或手动 clone 后复制 `skills/cee-admission-match/` 到你的 agent 的 skills 目录。
+### 安装后（首次跑数据）
+
+```bash
+cd ~/.zcode/skills/shandong-cee-line-diff   # 或对应安装目录
+python3 -m venv .venv && .venv/bin/pip install openpyxl pytest ruff
+# 把三个原始 xlsx 放进 data/（见 data/README.md），然后调用 skill
+```
 
 ### 使用
 
-替换 `data/` 下三个 xlsx 为当年数据 → 调用 `Skill("cee-admission-match")` →
+替换 `data/` 下三个 xlsx 为当年数据 → 调用 `Skill("shandong-cee-line-diff")` →
 skill 自主启动（识别文件 → AskUserQuestion 问一段线/范围 → 跑管线 → 派发 agent →
 审计 exit 0 → 产出报告）。
 
 ## 目录结构
 
 ```
-cee-admission-data/
-├── data/                  # 三个源 xlsx —— 只读，永不修改（SHA256 校验）
+shandong-cee-line-diff/    # = skill 本体（SKILL.md / REFERENCE.md / install.sh 在根）
+├── data/                  # 三个源 xlsx —— 只读，永不修改（SHA256 校验）；不入库
 ├── scripts/               # 全部脚本（纯函数为主，CLI 入口）
 │   ├── constants.py            # 一段线 / 列索引 / 批次字符串 / 日志常量
 │   ├── models.py               # TypedDict 契约（HistoryRow/DaglubenRow/...）
@@ -91,7 +89,6 @@ cee-admission-data/
 │   └── RUN_RENAME.md           # 改名网查 harness 侧运行指南
 ├── output/                # 最终产物（分层版、扁平版、各边界表）
 ├── tests/                 # pytest：纯函数单测 + 管线契约（覆盖率 ≥80%）
-├── skills/                # 年度复用 skill 草稿
 └── docs/superpowers/      # spec / 实施计划
 ```
 
@@ -234,7 +231,7 @@ WebSearch 查询（旧名/更名/转设/同源），写入 `research/<school>.md
 - [x] 专科行全排除（fixture + 真实数据 25472 = 23887 常规 + 1585 提前，专科 181 排除）。
 - [x] 分层与扁平同源一致（同一 MatchResult 列表，J/T/日志逐行相等）。
 - [x] 三源哈希不变（`tests/test_immutability.py` + 运行前后 `assert_unchanged`）。
-- [x] README 完整；skill 草稿存在（`skills/cee-admission-match/SKILL.md`）。
+- [x] README 完整；skill 存在（仓库根 `SKILL.md`）。
 
 ### 真实数据确定性跑归类分布（2026-06-23）
 
@@ -280,7 +277,7 @@ WebSearch 查询（旧名/更名/转设/同源），写入 `research/<school>.md
    或一键端到端验收：`.venv/bin/python -m scripts.run_iter2_acceptance`（重跑管线 +
    审计，exit 0 即过；可作 `pytest -m manual` 单点跑）。
 
-可复用的核心步骤已沉淀为 skill 草稿 `skills/cee-admission-match/SKILL.md`
+可复用的核心步骤已沉淀为 skill（仓库根 `SKILL.md`）
 （合并口径 / 归一化 / 六要素 / 核心名粗筛 / agent prompt / 边界三表 / 估算退化 / 改名网查）。
 
 ## 设计与计划
