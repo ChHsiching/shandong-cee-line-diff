@@ -252,6 +252,12 @@ def _locate_candidate(
     ]
     if len(same_core) == 1:
         return same_core[0]
+    # Fallback 2: 多个 same-core 候选时，按 J 最接近 echo 的(容差 0.5)——
+    # 粗筛/语义匹配携带的 J/T echo 可能因舍入/聚合漂移，取最接近的那行。
+    if same_core and j is not None:
+        closest = min(same_core, key=lambda h: abs((h.get("J") or 0) - (j or 0)))
+        if abs((closest.get("J") or 0) - (j or 0)) <= 0.5:
+            return closest
     return HistoryRow()
 
 
