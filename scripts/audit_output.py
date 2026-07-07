@@ -41,6 +41,8 @@ from typing import Any, Sequence
 import openpyxl
 
 from scripts.stage0_merge import build_unified_history
+from scripts.structured_log import JUDGMENTAL_STAGES
+from scripts.write_outputs import HEADER_STAGE
 
 __all__ = [
     "AuditReport",
@@ -82,9 +84,8 @@ PRODUCED_TABLES: tuple[str, ...] = (
 # iteration-3: stage-based whitelists (replace the old JUDGMENTAL_LOG_PREFIXES
 # copy). The audit reads 匹配阶段 by column NAME, so a future wording tweak in
 # the log constants cannot silently drop a row from a check.
-STAGE_HEADER = "匹配方式"
-JUDGMENTAL_STAGES: frozenset[str] = frozenset({"核心名匹配", "agent 语义匹配"})
-MATCHED_STAGES: frozenset[str] = frozenset({"严格匹配", "核心名匹配", "agent 语义匹配"})
+STAGE_HEADER = HEADER_STAGE  # #18d: 列名单点（write_outputs.HEADER_STAGE）
+MATCHED_STAGES: frozenset[str] = JUDGMENTAL_STAGES | {"严格匹配"}
 ESTIMATE_STAGE = "新增专业"
 
 # Column indices in the hierarchical / flat output (1-based) — used only for

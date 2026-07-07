@@ -13,7 +13,7 @@ from __future__ import annotations
 from scripts.constants import LOG_VERIFY_DEMOTE_PREFIX
 from scripts.models import StructuredLog
 
-__all__ = ["split_log"]
+__all__ = ["split_log", "JUDGMENTAL_STAGES"]
 
 # Marker tokens embedded inside the log body.
 _SINGLE_YEAR_MARKER = "（仅一年数据"
@@ -24,7 +24,8 @@ _COLON = "："
 
 # Stages whose matches are judgment-type (need second-pass verify).
 # The 二次复核 column is「确定」only for these after a confirmed verdict.
-_JUDGMENTAL_STAGES: tuple[str, ...] = ("核心名匹配", "agent 语义匹配")
+# 公开（audit_output 复用——#18d 单点化 stage 名，避免两处定义漂移）.
+JUDGMENTAL_STAGES: frozenset[str] = frozenset({"核心名匹配", "agent 语义匹配"})
 
 # Prefixed stages: log text before the first「：」 → stage label.
 _PREFIXED_STAGES: tuple[tuple[str, str], ...] = (
@@ -55,7 +56,7 @@ def split_log(log: str) -> StructuredLog:
     drift = _FLAG_YES if _DRIFT_MARKER in text else ""
 
     stage, note = _stage_and_note(text)
-    verify = _VERIFY_OK if stage in _JUDGMENTAL_STAGES else ""
+    verify = _VERIFY_OK if stage in JUDGMENTAL_STAGES else ""
     return StructuredLog(
         匹配方式=stage,
         仅一年数据=single_year,
@@ -104,7 +105,7 @@ def _match_keyword(text: str) -> tuple[str, str]:
     if text.startswith("这所学校今年没有在山东招生"):
         return "停招消失", text
     if text.startswith("往年有这个专业"):
-        return "往年有今天停招", text
+        return "往年今年停招", text
     if text.startswith("新校") or text.startswith("整校近三年无数据"):
         return "新校无历史", text
     return "", ""
