@@ -181,7 +181,7 @@ def _apply_rename(
     dgl_schools = sorted({d["school"] for d in dagluben if d.get("school")})
     hist_schools = sorted({h["school"] for h in history if h.get("school")})
 
-    candidates = prep_rename_candidates(dgl_schools, hist_schools, topk=5)
+    candidates = prep_rename_candidates(dgl_schools, hist_schools, topk=0)
     write_rename_prompt(candidates, semantic_dir)
 
     rename_path = semantic_dir / "rename_result.jsonl"
@@ -492,7 +492,13 @@ def run(
     dgl_unique = [
         s for s in sorted(dgl_present - hist_school_set) if s not in renamed_dgl_schools
     ]
-    hist_unique = [s for s in sorted(hist_school_set - dgl_present)]
+    # 改名旧校名从停招消失校表移出（它们是改名的旧名，不是真停招）。
+    rename_old_schools = {
+        r.get("old_school", "") for r in rename_rows if r.get("old_school")
+    }
+    hist_unique = [
+        s for s in sorted(hist_school_set - dgl_present) if s not in rename_old_schools
+    ]
     write_new_school_table(
         [{"new_school": s, "major_count_2026": major_count[s]} for s in dgl_unique],
         out_dir / "新增校表.xlsx",

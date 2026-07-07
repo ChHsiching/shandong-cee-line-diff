@@ -97,7 +97,7 @@ RENAME_PROMPT_TEXT = """\
 
 对 `rename_candidates.jsonl` 中每个 `new_school`：
 
-1. 审查其 `candidate_old_schools`(已用字符串相似度预筛 top-k，**仅作提案**)。
+1. 审查其 `candidate_old_schools`(全部历史独有校,按字符串相似度排序,**仅作提案**——真正的旧校名可能字面差异很大,如「佛山科学技术学院」→「佛山大学」字面几乎无关却是同一所,不要因相似度低就放过,必要时上网搜 new_school 官方信息确认前身/更名/转设/合并)。
 2. 用语义判断: 该 new_school 是否与某候选 old_school 是**同一所学校的改名/
    转设/合并**? 如是, 选出最可能的 old_school; 若候选均不构成, 选 null。
 3. 给出 `confidence` ∈ [0,1] 的语义置信度(非字符串相似度)。
@@ -222,8 +222,10 @@ def write_rename_prompt(
     cand_path = out_dir / "rename_candidates.jsonl"
     lines = [
         json.dumps(
-            {"new_school": c["new_school"],
-             "candidate_old_schools": c["candidate_old_schools"]},
+            {
+                "new_school": c["new_school"],
+                "candidate_old_schools": c["candidate_old_schools"],
+            },
             ensure_ascii=False,
         )
         for c in candidates
@@ -252,9 +254,7 @@ def _parse_line(raw: str, path: Path, lineno: int) -> dict[str, object]:
         raise RenameContractError(f"{path.name}:{lineno}: 顶层不是 JSON 对象")
     missing = [k for k in REQUIRED_KEYS if k not in obj]
     if missing:
-        raise RenameContractError(
-            f"{path.name}:{lineno}: 缺少必需字段 {missing}"
-        )
+        raise RenameContractError(f"{path.name}:{lineno}: 缺少必需字段 {missing}")
     return obj
 
 
@@ -330,9 +330,7 @@ def apply_rename(
                 )
 
             # confidence range always enforced (regardless of is_rename).
-            if (not isinstance(conf_raw, (int, float))) or isinstance(
-                conf_raw, bool
-            ):
+            if (not isinstance(conf_raw, (int, float))) or isinstance(conf_raw, bool):
                 raise RenameContractError(
                     f"{path.name}:{lineno}: confidence 不是数值 ({conf_raw!r})"
                 )
