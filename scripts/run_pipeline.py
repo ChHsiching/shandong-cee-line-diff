@@ -7,8 +7,6 @@ Plan v2 Slice 7 / issue #8):
        ↓
     Stage 1  match_strict                       (严格 3-tuple)
        ↓
-    Stage 1.5 match_coarse                      (核心名粗筛 + 括号子集消歧)
-       ↓
     Stage 2  (agent — harness-side)
        - if semantic-match/batch_*_result.jsonl exist → apply_results
        - else → emit batch_NN_prompt.json + log「Stage2 待 harness 派发」
@@ -48,13 +46,16 @@ from openpyxl import load_workbook
 from scripts import io_source
 from scripts.constants import FLIGHT_BATCH, J3_SHEET
 from scripts.models import DaglubenRow, EstimateResult, HistoryRow, MatchResult
-from scripts.rename_detect import apply_rename, prep_rename_candidates, write_rename_prompt
+from scripts.rename_detect import (
+    apply_rename,
+    prep_rename_candidates,
+    write_rename_prompt,
+)
 from scripts.stage0_merge import (
     build_dagluben_early,
     build_dagluben_regular,
     build_unified_history,
 )
-from scripts.stage1_5_coarse import build_core_idx, match_coarse
 from scripts.stage1_strict import match_strict
 from scripts.stage2_agent import build_batches, write_prompts
 from scripts.stage2_apply import apply_results
@@ -134,11 +135,10 @@ def _apply_stage2(
     result_paths = sorted(semantic_dir.glob("batch_*_result.jsonl"))
     if with_agent_results and result_paths:
         applied_results = apply_results(result_paths, post_coarse_unmatched, history)
-        resolved_idx = {
-            r["src_row_idx"] for r in applied_results if r.get("matched")
-        }
+        resolved_idx = {r["src_row_idx"] for r in applied_results if r.get("matched")}
         still = [
-            d for d in post_coarse_unmatched
+            d
+            for d in post_coarse_unmatched
             if d["src_row_idx"] not in resolved_idx
             and not any(
                 r["src_row_idx"] == d["src_row_idx"] and r.get("matched")
@@ -147,7 +147,9 @@ def _apply_stage2(
         ]
         logger.info(
             "Stage2: 已应用 %d 条 agent 结果（%d 条命中，%d 条仍未匹配）",
-            len(applied_results), len(resolved_idx), len(still),
+            len(applied_results),
+            len(resolved_idx),
+            len(still),
         )
         return applied_results, still, True
 
@@ -185,9 +187,7 @@ def _apply_rename(
     rename_path = semantic_dir / "rename_result.jsonl"
     if with_agent_results and rename_path.exists():
         rename_rows, confirmed = apply_rename([rename_path], dagluben, history)
-        logger.info(
-            "改名: 已应用 rename_result.jsonl（%d 所改名校）", len(confirmed)
-        )
+        logger.info("改名: 已应用 rename_result.jsonl（%d 所改名校）", len(confirmed))
         return rename_rows, confirmed, True
 
     logger.info(
@@ -222,14 +222,14 @@ def _research_summary(text: str, school: str) -> str:
 
 
 def _enrich_rename_rows(
-    rename_rows: list, dagluben: list, research_dir: str = "research",
+    rename_rows: list,
+    dagluben: list,
+    research_dir: str = "research",
 ) -> None:
     """Populate ``major_count_2026`` + websearch ``remark`` on rename rows
     (spec §6 Task 6.3) before the学校改名表 is written. apply_rename returns
     RenameRows without these fields."""
-    cnt = collections.Counter(
-        d.get("school", "") for d in dagluben if d.get("school")
-    )
+    cnt = collections.Counter(d.get("school", "") for d in dagluben if d.get("school"))
     rdir = Path(research_dir)
     for r in rename_rows:
         ns = r.get("new_school", "")
@@ -288,6 +288,7 @@ def _build_main_results(
         school = d.get("school", "")
         if school in renamed_dgl_schools:
             from scripts.constants import LOG_RENAME_PENDING
+
             by_idx[idx] = MatchResult(
                 src_row_idx=idx,
                 school=school,
@@ -315,6 +316,7 @@ def _build_main_results(
             # 特殊: 未匹配本科。spec 要求每行都有日志，兜底发特殊情况日志
             # （详情见 output/特殊情况.xlsx）。
             from scripts.constants import LOG_SPECIAL_UNMATCHED
+
             by_idx[idx] = MatchResult(
                 src_row_idx=idx,
                 school=school,
@@ -396,33 +398,42 @@ def run(
     dgl_indices = [d["src_row_idx"] for d in dagluben]
     logger.info(
         "Stage0: 统一历史 %d 行；大绿本本科专业 %d 行",
-        len(history), len(dagluben),
+        len(history),
+        len(dagluben),
     )
 
     # --- Stage 1 (strict) ---------------------------------------------------
     strict_results = match_strict(dagluben, history)
     strict_unmatched_dgl = [
-        d for d, r in zip(dagluben, strict_results, strict=True)
-        if not r.get("matched")
+        d for d, r in zip(dagluben, strict_results, strict=True) if not r.get("matched")
     ]
     logger.info(
         "Stage1: 严格匹配 %d/%d (%.1f%%)",
         sum(1 for r in strict_results if r.get("matched")),
         len(strict_results),
-        100.0 * sum(1 for r in strict_results if r.get("matched")) / max(1, len(strict_results)),
+        100.0
+        * sum(1 for r in strict_results if r.get("matched"))
+        / max(1, len(strict_results)),
     )
 
-    # --- Stage 1.5 (coarse) -------------------------------------------------
-    core_idx = build_core_idx(history)
-    coarse_results, post_coarse_unmatched = match_coarse(strict_unmatched_dgl, core_idx)
+    # --- Stage 1.5 已并入 Stage 2 ------------------------------------------
+    # 程序模糊匹配（核心名粗筛自动接受）已停用：全部 strict 未匹配交由 Stage 2
+    # agent 逐条语义判断。skill 规格＝只有「程序严格匹配 + agent 语义匹配」，
+    # 不让程序做模糊决定（避免「临床医学5+3」式低级误判）。coarse_results 恒空，
+    # 保留为占位以维持下游 _build_main_results 签名稳定（#18 清理时再删）。
+    coarse_results: list[MatchResult] = []
+    post_coarse_unmatched = strict_unmatched_dgl
     logger.info(
-        "Stage1.5: 粗筛自动接受 %d；剩余 %d 进 Stage2",
-        len(coarse_results), len(post_coarse_unmatched),
+        "Stage1.5: 程序模糊匹配已停用，%d 条 strict 未匹配全部进 Stage2 agent",
+        len(post_coarse_unmatched),
     )
 
     # --- Stage 2 (agent) ----------------------------------------------------
     semantic_results, post_stage2_unmatched, stage2_applied = _apply_stage2(
-        post_coarse_unmatched, history, semantic_dir, with_agent_results,
+        post_coarse_unmatched,
+        history,
+        semantic_dir,
+        with_agent_results,
     )
 
     # --- Stage 3 (new-major estimation) ------------------------------------
@@ -436,35 +447,39 @@ def run(
     for d in new_majors:
         est = estimate(d, by_school.get(d["school"], []))
         new_major_estimates[d["src_row_idx"]] = est
-        new_major_rows.append({
-            "src_row_idx": d["src_row_idx"],
-            "school": d.get("school", ""),
-            "major": d.get("major", ""),
-            "subject": d.get("subject", ""),
-            "value": est.get("value"),
-            "T": est.get("T"),
-            "level": est.get("level"),
-            "n": est.get("n"),
-            "log": est.get("log", ""),
-        })
+        new_major_rows.append(
+            {
+                "src_row_idx": d["src_row_idx"],
+                "school": d.get("school", ""),
+                "major": d.get("major", ""),
+                "subject": d.get("subject", ""),
+                "value": est.get("value"),
+                "T": est.get("T"),
+                "level": est.get("level"),
+                "n": est.get("n"),
+                "log": est.get("log", ""),
+            }
+        )
     write_new_major_table(new_major_rows, out_dir / "新增专业.xlsx")
     logger.info("Stage3 新增专业: %d", len(new_majors))
 
     # --- Stage 3 (rename) --------------------------------------------------
     rename_rows, renamed_dgl_schools, rename_applied = _apply_rename(
-        dagluben, history, semantic_dir, with_agent_results,
+        dagluben,
+        history,
+        semantic_dir,
+        with_agent_results,
     )
     _enrich_rename_rows(rename_rows, dagluben)
     write_rename_table(rename_rows, out_dir / "学校改名表.xlsx")
 
     # --- Stage 3 (edges: deleted / flight / special) -----------------------
     dgl_present = {d["school"] for d in dagluben if d.get("school")}
-    dgl_school_major = {
-        (d.get("school", ""), d.get("major", "")) for d in dagluben
-    }
+    dgl_school_major = {(d.get("school", ""), d.get("major", "")) for d in dagluben}
     deleted_pool = deleted_majors(history, dgl_present, renamed_dgl_schools)
     true_deleted = [
-        dm for dm in deleted_pool
+        dm
+        for dm in deleted_pool
         if (dm.get("school", ""), dm.get("major", "")) not in dgl_school_major
     ]
     write_deleted_major_table(true_deleted, out_dir / "被删旧专业.xlsx")
@@ -475,12 +490,9 @@ def run(
     )
     hist_school_set = {h["school"] for h in history if h.get("school")}
     dgl_unique = [
-        s for s in sorted(dgl_present - hist_school_set)
-        if s not in renamed_dgl_schools
+        s for s in sorted(dgl_present - hist_school_set) if s not in renamed_dgl_schools
     ]
-    hist_unique = [
-        s for s in sorted(hist_school_set - dgl_present)
-    ]
+    hist_unique = [s for s in sorted(hist_school_set - dgl_present)]
     write_new_school_table(
         [{"new_school": s, "major_count_2026": major_count[s]} for s in dgl_unique],
         out_dir / "新增校表.xlsx",
@@ -504,27 +516,39 @@ def run(
     verify_applied = False
     if with_agent_results and verify_result_paths:
         from scripts.verify_judgment import apply_verify, filter_demoted
-        judgmental = [r for r in (coarse_results + semantic_results)]
+
+        judgmental = list(
+            semantic_results
+        )  # coarse 已停用，判断型匹配只剩 agent 语义匹配
         verify_out = apply_verify(verify_result_paths, dagluben, judgmental)
         verdict_by_idx = verify_out["verdict_by_idx"]
         # reasons map: pull the reason from the demoted EdgeRows (built by apply_verify).
-        reasons = {e["src_row_idx"]: e["log"].split("：", 1)[1] if "：" in e.get("log", "") else ""
-                   for e in verify_out["demoted"]}
-        coarse_for_main, _, _ = filter_demoted(
-            coarse_results, set(), verdict_by_idx, reasons,
-        )
+        reasons = {
+            e["src_row_idx"]: e["log"].split("：", 1)[1]
+            if "：" in e.get("log", "")
+            else ""
+            for e in verify_out["demoted"]
+        }
+        # coarse 已停用（coarse_results 恒空）→ 无需 filter；coarse_for_main 保持空。
+        coarse_for_main: list[MatchResult] = []
         semantic_for_main, _, _ = filter_demoted(
-            semantic_results, set(), verdict_by_idx, reasons,
+            semantic_results,
+            set(),
+            verdict_by_idx,
+            reasons,
         )
         # Build the classified set from the filtered results (so存疑 idx drop).
         classified_for_main = (
             {r["src_row_idx"] for r in strict_results if r.get("matched")}
-            | {r["src_row_idx"] for r in coarse_for_main}
             | {r["src_row_idx"] for r in semantic_for_main if r.get("matched")}
             | {d["src_row_idx"] for d in new_majors}
             | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
         )
-        demoted_map = {idx: reasons.get(idx, "") for idx, v in verdict_by_idx.items() if v == "存疑"}
+        demoted_map = {
+            idx: reasons.get(idx, "")
+            for idx, v in verdict_by_idx.items()
+            if v == "存疑"
+        }
         verify_applied = True
         logger.info(
             "复核: 已应用 %d 条复核结果（%d 确定，%d 存疑→特殊）",
@@ -534,7 +558,9 @@ def run(
         )
     else:
         if verify_result_paths:
-            logger.info("复核: 检测到 verify_*_result.jsonl 但未启用 --with-agent-results，跳过 apply")
+            logger.info(
+                "复核: 检测到 verify_*_result.jsonl 但未启用 --with-agent-results，跳过 apply"
+            )
         else:
             logger.info(
                 "复核: 未发现 verify_*_result.jsonl，判断型复核 待 harness 派发"
@@ -542,12 +568,15 @@ def run(
             )
 
     # Flight + remaining-unmatched → special.
-    classified_idx = classified_for_main if classified_for_main is not None else (
-        {r["src_row_idx"] for r in strict_results if r.get("matched")}
-        | {r["src_row_idx"] for r in coarse_results}
-        | {r["src_row_idx"] for r in semantic_results if r.get("matched")}
-        | {d["src_row_idx"] for d in new_majors}
-        | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
+    classified_idx = (
+        classified_for_main
+        if classified_for_main is not None
+        else (
+            {r["src_row_idx"] for r in strict_results if r.get("matched")}
+            | {r["src_row_idx"] for r in semantic_results if r.get("matched")}
+            | {d["src_row_idx"] for d in new_majors}
+            | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
+        )
     )
     remaining_unmatched = [
         d for d in dagluben if d["src_row_idx"] not in classified_idx
@@ -559,16 +588,24 @@ def run(
 
     # --- Outputs (hierarchical + flat, same MatchResult source) ------------
     main_results = _build_main_results(
-        dagluben, strict_results, coarse_for_main, semantic_for_main,
-        new_major_estimates, renamed_dgl_schools,
+        dagluben,
+        strict_results,
+        coarse_for_main,
+        semantic_for_main,
+        new_major_estimates,
+        renamed_dgl_schools,
         classified_idx=classified_for_main,
     )
     dl_path = data_dir / SOURCE_FILES["dl"]
     write_hierarchical(
-        dl_path, main_results, out_dir / "大绿本_附线差_分层版.xlsx",
+        dl_path,
+        main_results,
+        out_dir / "大绿本_附线差_分层版.xlsx",
     )
     write_flat(
-        dl_path, main_results, out_dir / "大绿本_附线差_扁平版.xlsx",
+        dl_path,
+        main_results,
+        out_dir / "大绿本_附线差_扁平版.xlsx",
     )
 
     # --- Source immutability guard (after) ---------------------------------
@@ -590,8 +627,12 @@ def run(
 
     logger.info(
         "覆盖率: 匹配 %d / 新增 %d / 特殊 %d / 被删 %d / 改名 %d （总 %d）",
-        coverage["matched"], coverage["new_major"], coverage["special"],
-        coverage["deleted"], coverage["rename"], coverage["total_dagluben"],
+        coverage["matched"],
+        coverage["new_major"],
+        coverage["special"],
+        coverage["deleted"],
+        coverage["rename"],
+        coverage["total_dagluben"],
     )
 
     return {
@@ -600,7 +641,9 @@ def run(
         "dagluben_rows": dagluben,
         "main_results": main_results,
         "new_major_rows": new_major_rows,
-        "post_coarse_unmatched_indices": [d["src_row_idx"] for d in post_coarse_unmatched],
+        "post_coarse_unmatched_indices": [
+            d["src_row_idx"] for d in post_coarse_unmatched
+        ],
         "edge": {
             "deleted": true_deleted,
             "special": special_rows,
@@ -625,29 +668,39 @@ def main() -> None:
         description="Run the deterministic admission-data pipeline end-to-end.",
     )
     parser.add_argument(
-        "--data-dir", type=Path, default=Path("data"),
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
         help="Directory holding the three source xlsx (default: data)",
     )
     parser.add_argument(
-        "--out-dir", type=Path, default=Path("output"),
+        "--out-dir",
+        type=Path,
+        default=Path("output"),
         help="Directory for final xlsx outputs (default: output)",
     )
     parser.add_argument(
-        "--semantic-dir", type=Path, default=Path("semantic-match"),
+        "--semantic-dir",
+        type=Path,
+        default=Path("semantic-match"),
         help="Directory for agent prompts/results (default: semantic-match)",
     )
     parser.add_argument(
-        "--intermediate-dir", type=Path, default=Path("intermediate"),
+        "--intermediate-dir",
+        type=Path,
+        default=Path("intermediate"),
         help="Directory for intermediate CSVs (default: intermediate)",
     )
     parser.add_argument(
-        "--with-agent-results", action="store_true",
+        "--with-agent-results",
+        action="store_true",
         help="Apply any batch_*_result.jsonl / rename_result.jsonl present in "
-             "semantic-dir. Without this flag, prompts are emitted and the "
-             "agent step is logged as pending harness dispatch.",
+        "semantic-dir. Without this flag, prompts are emitted and the "
+        "agent step is logged as pending harness dispatch.",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     args = parser.parse_args()
@@ -669,7 +722,7 @@ def main() -> None:
     semantic_suffix = "+语义" if report["stage2_applied"] else ""
     print("=== 管线确定性链完成 ===")
     print(f"大绿本本科专业总数: {cov['total_dagluben']}")
-    print(f"  严格+粗筛{semantic_suffix}匹配: {cov['matched']}")
+    print(f"  严格匹配{semantic_suffix}: {cov['matched']}")
     print(f"  新增专业(估算):     {cov['new_major']}")
     print(f"  特殊情况:           {cov['special']}")
     print(f"  被删旧专业:         {cov['deleted']}")
@@ -679,7 +732,7 @@ def main() -> None:
     if not report["stage2_applied"]:
         print()
         print("注: 未应用 Stage2 agent 结果（语义匹配待 harness 派发，")
-        print("    见 semantic-match/RUN.md）。匹配置为严格+粗筛口径。")
+        print("    见 semantic-match/RUN.md）。匹配置为严格匹配口径。")
     if not report["rename_applied"]:
         print("注: 未应用改名 agent 结果（改名配对待 harness 派发，")
         print("    见 research/RUN_RENAME.md）。被删/新增校为上界。")

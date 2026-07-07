@@ -42,7 +42,8 @@ from scripts.run_pipeline import run
 #
 #   近三年 (j3) 常规批一段线:
 #     - 示例大学  计算机科学与技术     → strict-matches dl row 1
-#     - 示例大学  数学类               → coarse-matches dl row 2 (核心名唯一)
+#     - 示例大学  数学类               → Stage 2 agent 匹配 dl row 2 (核心名唯一;
+#                                          with_agent_results=False 时 dl row 2 进 special)
 #     - 示例大学  历史学               → absent from 2026 → 被删 (school present)
 #     - 停招大学  物理                  → school absent from 2026 → 停招消失校
 #
@@ -51,7 +52,7 @@ from scripts.run_pipeline import run
 #
 #   大绿本 (dl):
 #     - 4.常规批 示例大学 01 计算机科学与技术  (strict match)
-#     - 4.常规批 示例大学 02 数学类(拔尖)     (coarse match: 数学 core 唯一)
+#     - 4.常规批 示例大学 02 数学类(拔尖)     (Stage 2 待 agent: 数学 core 唯一)
 #     - 4.常规批 示例大学 03 量子信息          (new major: no同校 core)
 #     - 4.常规批 专科大学 05 护理             subtitle contains「专科」→ excluded
 #     - 4.常规批 新校 08 人工智能             (new school + new major → 新增 level2)
@@ -62,19 +63,51 @@ from scripts.run_pipeline import run
 
 
 _J3_HEADER = [
-    "批次", "学校代码", "学校名称", "专业名称", "选考科目", "备注",
-    "基础专业名", "是否括号专业", "括号内容", "统计线差",
-    "2023线差", "2024线差", "2025线差",
-    "x", "x", "x", "可用年份数", "x", "x", "线差标准差",
+    "批次",
+    "学校代码",
+    "学校名称",
+    "专业名称",
+    "选考科目",
+    "备注",
+    "基础专业名",
+    "是否括号专业",
+    "括号内容",
+    "统计线差",
+    "2023线差",
+    "2024线差",
+    "2025线差",
+    "x",
+    "x",
+    "x",
+    "可用年份数",
+    "x",
+    "x",
+    "线差标准差",
 ]
 
 
 def _j3_row(batch, school, major, j, t, subject="物理和化学"):
     return [
-        batch, "C001", school, major, subject, "",
-        major, "否", "", j,
-        j, j, j,
-        "", "", "", 3, "", "", t,
+        batch,
+        "C001",
+        school,
+        major,
+        subject,
+        "",
+        major,
+        "否",
+        "",
+        j,
+        j,
+        j,
+        j,
+        "",
+        "",
+        "",
+        3,
+        "",
+        "",
+        t,
     ]
 
 
@@ -87,10 +120,9 @@ def _build_j3(tmp_xlsx):
         _j3_row("常规批一段线", "停招大学", "物理", 80.0, 3.0),
         # 军航大学 has a history major with the SAME core (飞行技术) but a
         # DIFFERENT 招生类别 (地方专项计划). The dagluben 飞行技术(军队) row is
-        # 普通计划 → strict fails (cat differs), coarse fails (different cat
-        # bucket), AND identify_new_majors sees the school has 飞行技术 in its
-        # history cores so it is NOT a真新增 → it falls through to the special
-        # table as a FLIGHT_BATCH unmatched row.
+        # 普通计划 → strict fails (cat differs), AND identify_new_majors sees
+        # the school has 飞行技术 in its history cores so it is NOT a真新增
+        # → it falls through to the special table.
         _j3_row("常规批一段线", "军航大学(地方专项计划)", "飞行技术", 50.0, 2.0),
         # 常规批二段线 — must be dropped.
         _j3_row("常规批二段线", "示例大学", "应被丢弃", 99.0, 1.0),
@@ -100,32 +132,86 @@ def _build_j3(tmp_xlsx):
 
 def _build_tq(tmp_xlsx):
     header = [
-        "批次名称", "招生类别", "x", "院校名称", "x", "专业名称", "选考科目",
-        "x", "x", "x", "2025低分",
-        "x", "x", "x", "2024低分",
-        "x", "x", "x", "2023低分",
+        "批次名称",
+        "招生类别",
+        "x",
+        "院校名称",
+        "x",
+        "专业名称",
+        "选考科目",
+        "x",
+        "x",
+        "x",
+        "2025低分",
+        "x",
+        "x",
+        "x",
+        "2024低分",
+        "x",
+        "x",
+        "x",
+        "2023低分",
     ]
     # 飞行大学 飞行技术 low scores: 2025=501, 2024=504, 2023=503 →
     # line-diff = low - one_line (441/444/443) = 60/60/60 → mean 60.0.
     rows = [
         header,
-        ["本科提前批A类", "", "", "飞行大学", "", "飞行技术", "物理",
-         "", "", "", 501, "", "", "", 504, "", "", "", 503],
+        [
+            "本科提前批A类",
+            "",
+            "",
+            "飞行大学",
+            "",
+            "飞行技术",
+            "物理",
+            "",
+            "",
+            "",
+            501,
+            "",
+            "",
+            "",
+            504,
+            "",
+            "",
+            "",
+            503,
+        ],
     ]
     return tmp_xlsx(rows)
 
 
 def _dl_row(batch, subtitle, code, school, name, subject="物理和化学"):
     return [
-        batch, subtitle, "A001", school, code, name, subject,
-        "4", "2", "", "", "",
+        batch,
+        subtitle,
+        "A001",
+        school,
+        code,
+        name,
+        subject,
+        "4",
+        "2",
+        "",
+        "",
+        "",
     ]
 
 
 def _build_dl(tmp_xlsx):
     header = [
-        "批次", "小标题", "学校代码", "学校名", "代号", "名称",
-        "选考科目要求", "学制", "计划数", "学校备注", "年收费", "整行校准",
+        "批次",
+        "小标题",
+        "学校代码",
+        "学校名",
+        "代号",
+        "名称",
+        "选考科目要求",
+        "学制",
+        "计划数",
+        "学校备注",
+        "年收费",
+        "整行校准",
     ]
     rows = [
         header,
@@ -135,20 +221,34 @@ def _build_dl(tmp_xlsx):
         ["4.常规批", "普通计划", "A001", "示例大学", "", "", "", "", "100", "", "", ""],
         # 专业行 1 — strict match (计算机科学与技术)
         _dl_row("4.常规批", "普通计划", "01", "示例大学", "计算机科学与技术"),
-        # 专业行 2 — coarse match (数学类(拔尖) → 数学 core 唯一)
-        _dl_row("4.常规批", "普通计划", "02", "示例大学", "数学类(拔尖)", subject="物理"),
+        # 专业行 2 — Stage 2 待 agent (数学类(拔尖) → 数学 core 唯一; coarse 已停用)
+        _dl_row(
+            "4.常规批", "普通计划", "02", "示例大学", "数学类(拔尖)", subject="物理"
+        ),
         # 专业行 3 — new major (量子信息, no同校 core)
         _dl_row("4.常规批", "普通计划", "03", "示例大学", "量子信息"),
         # 专业行 4 — 专科 subtitle row (must be excluded)
-        ["4.常规批", "专科", "A002", "专科大学", "05", "护理", "物理",
-         "3", "50", "", "", ""],
+        [
+            "4.常规批",
+            "专科",
+            "A002",
+            "专科大学",
+            "05",
+            "护理",
+            "物理",
+            "3",
+            "50",
+            "",
+            "",
+            "",
+        ],
         # 专业行 5 — 新校 + 新专业 (新增 level2: no history at all)
         _dl_row("4.常规批", "普通计划", "08", "新校", "人工智能"),
         # 提前批 A类 飞行大学 飞行技术 (matches tq)
         _dl_row("1.提前批A类", "普通计划", "06", "飞行大学", "飞行技术"),
         # 军航大学 飞行技术(军队) — school has 飞行技术 core history under a
-        # different 招生类别 (地方专项计划) so it is NOT a真新增, but strict/coarse
-        # both fail (different cat / different stripped) → falls to special.
+        # different 招生类别 (地方专项计划) so it is NOT a真新增, strict fails
+        # (different cat) → falls to special.
         _dl_row("4.常规批", "普通计划", "07", "军航大学", "飞行技术(军队)"),
     ]
     return tmp_xlsx(rows)
@@ -211,9 +311,9 @@ def test_run_excludes_zhuanke_rows(fixture_workbooks, tmp_path):
         all_major_names.append(r.get("major", ""))
 
     assert "护理" not in all_major_names, "专科 row leaked into本科 output"
-    assert "专科大学" not in {
-        r.get("school", "") for r in report["main_results"]
-    }, "专科学校 leaked into main output"
+    assert "专科大学" not in {r.get("school", "") for r in report["main_results"]}, (
+        "专科学校 leaked into main output"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -254,9 +354,7 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
         h_end = tuple(h[k] for k in row_end_keys)
         f_end = tuple(f[k] for k in row_end_keys)
         if h_end != f_end:
-            mismatches.append(
-                f"{key}: hier={h_end!r} flat={f_end!r}"
-            )
+            mismatches.append(f"{key}: hier={h_end!r} flat={f_end!r}")
     assert not mismatches, "hierarchical/flat diverged:\n" + "\n".join(mismatches)
 
     # Every major row in the flat output must also appear in the hierarchical
@@ -273,7 +371,7 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
 
 def test_every_undergrad_major_is_classified(fixture_workbooks, tmp_path):
     """Every大绿本本科专业 row must appear in exactly one of:
-      - main_results (matched via strict/coarse/agent)
+      - main_results (matched via strict/agent)
       - new_major_rows (新增估算)
       - edge.special (无法匹配)
       - edge.rename_pending (改名校占位, only when rename results applied)
@@ -281,9 +379,7 @@ def test_every_undergrad_major_is_classified(fixture_workbooks, tmp_path):
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     report = run(data_dir, out_dir, with_agent_results=False)
 
-    matched_idx = {
-        r["src_row_idx"] for r in report["main_results"] if r.get("matched")
-    }
+    matched_idx = {r["src_row_idx"] for r in report["main_results"] if r.get("matched")}
     new_idx = {r["src_row_idx"] for r in report["new_major_rows"]}
     special_idx = {r["src_row_idx"] for r in report["edge"]["special"]}
     # rename_pending only appears when rename results exist; without them,
@@ -297,8 +393,8 @@ def test_every_undergrad_major_is_classified(fixture_workbooks, tmp_path):
     assert not missing, f"unclassified大绿本 rows: {sorted(missing)}"
 
     # No double-counting: buckets are disjoint.
-    overlap = (matched_idx & new_idx) | (matched_idx & special_idx) | (
-        new_idx & special_idx
+    overlap = (
+        (matched_idx & new_idx) | (matched_idx & special_idx) | (new_idx & special_idx)
     )
     assert not overlap, f"rows double-classified: {sorted(overlap)}"
 
@@ -315,10 +411,12 @@ def test_classification_counts_on_fixture(fixture_workbooks, tmp_path):
 
     # Row 4 in fixture = 示例大学 计算机科学与技术 → strict match.
     # We need the actual src_row_idx values. They are 1-based row indices in the
-    #大绿本 workbook. Build the expected map by re-reading the source.
+    # 大绿本 workbook. Build the expected map by re-reading the source.
     dl_rows = list(
         openpyxl.load_workbook(
-            (data_dir / "山东省2026年大绿本招生计划.xlsx"), read_only=True, data_only=True
+            (data_dir / "山东省2026年大绿本招生计划.xlsx"),
+            read_only=True,
+            data_only=True,
         ).active.iter_rows(values_only=True)
     )
     # Re-derive the本科-only major row count the same way build_dagluben_* do:
@@ -341,26 +439,25 @@ def test_classification_counts_on_fixture(fixture_workbooks, tmp_path):
         if r.get("matched")
     }
     # 计算机科学与技术 strict-matches; 飞行技术 (early batch) strict-matches tq;
-    # 数学类(拔尖) coarse-matches 数学.
+    # 数学类(拔尖) — coarse 已停用，with_agent_results=False 时 Stage 2 不 apply → special.
     assert ("示例大学", "计算机科学与技术") in matched_schools_major
     assert ("飞行大学", "飞行技术") in matched_schools_major
-    assert ("示例大学", "数学类(拔尖)") in matched_schools_major
 
     # 量子信息 + 人工智能 are new majors (no同校 core in history).
     new_pairs = {(r.get("school"), r.get("major")) for r in report["new_major_rows"]}
     assert ("示例大学", "量子信息") in new_pairs
     assert ("新校", "人工智能") in new_pairs
     # 新校 has no history at all → level 2.
-    xc_row = next(
-        r for r in report["new_major_rows"] if r.get("school") == "新校"
-    )
+    xc_row = next(r for r in report["new_major_rows"] if r.get("school") == "新校")
     assert xc_row["level"] == 2
 
-    # 飞行技术(军队) at 军航大学 → special.
+    # 飞行技术(军队) at 军航大学 → special; 数学类(拔尖) → special (coarse 已停用,
+    # with_agent_results=False 时 Stage 2 未 apply).
     special_pairs = {
         (r.get("school"), r.get("major")) for r in report["edge"]["special"]
     }
     assert ("军航大学", "飞行技术(军队)") in special_pairs
+    assert ("示例大学", "数学类(拔尖)") in special_pairs
 
     # Coverage report keys exist and sum correctly.
     cov = report["coverage"]
@@ -379,30 +476,31 @@ def test_without_agent_results_prompts_are_written_and_logged(
     fixture_workbooks, tmp_path, caplog
 ):
     """When no semantic-match/batch_*_result.jsonl exists, the run must:
-      - still succeed,
-      - write batch_NN_prompt.json files under semantic-match/,
-      - log that Stage 2 agent dispatch is pending.
+    - still succeed,
+    - write batch_NN_prompt.json files under semantic-match/,
+    - log that Stage 2 agent dispatch is pending.
     """
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     semantic_dir = tmp_path / "semantic-match"
 
     with caplog.at_level(logging.INFO, logger="scripts.run_pipeline"):
         report = run(
-            data_dir, out_dir, with_agent_results=False,
+            data_dir,
+            out_dir,
+            with_agent_results=False,
             semantic_dir=semantic_dir,
         )
 
-    # If strict+coarse already resolved everything, prompts may be empty; that
+    # If strict already resolved everything, prompts may be empty; that
     # is legitimate. The key contract is: no result jsonl applied.
     assert report["stage2_applied"] is False
-    assert any("Stage2" in rec.message and "待 harness" in rec.message
-               for rec in caplog.records), \
-        "expected a 'Stage2 pending harness dispatch' log line"
+    assert any(
+        "Stage2" in rec.message and "待 harness" in rec.message
+        for rec in caplog.records
+    ), "expected a 'Stage2 pending harness dispatch' log line"
 
 
-def test_with_stub_agent_results_back_fills_main_table(
-    fixture_workbooks, tmp_path
-):
+def test_with_stub_agent_results_back_fills_main_table(fixture_workbooks, tmp_path):
     """When semantic-match/batch_*_result.jsonl exists, the run applies it.
 
     We stage a stub jsonl that resolves the otherwise-new「量子信息」to a
@@ -413,8 +511,7 @@ def test_with_stub_agent_results_back_fills_main_table(
     semantic_dir = tmp_path / "semantic-match"
 
     # First run to discover the unmatched src_row_idx values.
-    probe = run(data_dir, out_dir, with_agent_results=False,
-                semantic_dir=semantic_dir)
+    probe = run(data_dir, out_dir, with_agent_results=False, semantic_dir=semantic_dir)
     unmatched_after_coarse = probe["post_coarse_unmatched_indices"]
 
     if unmatched_after_coarse:
@@ -423,21 +520,23 @@ def test_with_stub_agent_results_back_fills_main_table(
         target_dgl = next(
             d for d in probe["dagluben_rows"] if d["src_row_idx"] == target_idx
         )
-        line = json.dumps({
-            "src_row_idx": target_idx,
-            "school": target_dgl["school"],
-            "major": target_dgl["major"],
-            "match": None,
-            "J": None,
-            "T": None,
-            "reason": "契约测试桩: 无对应",
-        }, ensure_ascii=False)
+        line = json.dumps(
+            {
+                "src_row_idx": target_idx,
+                "school": target_dgl["school"],
+                "major": target_dgl["major"],
+                "match": None,
+                "J": None,
+                "T": None,
+                "reason": "契约测试桩: 无对应",
+            },
+            ensure_ascii=False,
+        )
         (semantic_dir / "batch_99_result.jsonl").write_text(
             line + "\n", encoding="utf-8"
         )
 
-    report = run(data_dir, out_dir, with_agent_results=True,
-                 semantic_dir=semantic_dir)
+    report = run(data_dir, out_dir, with_agent_results=True, semantic_dir=semantic_dir)
     assert report["stage2_applied"] is True
 
 
@@ -455,9 +554,9 @@ def test_without_rename_results_renamed_set_is_empty_and_logged(
     with caplog.at_level(logging.INFO, logger="scripts.run_pipeline"):
         report = run(data_dir, out_dir, with_agent_results=False)
     assert report["renamed_dgl_schools"] == set()
-    assert any("改名" in rec.message and "待 harness" in rec.message
-               for rec in caplog.records), \
-        "expected a 'rename pending harness dispatch' log line"
+    assert any(
+        "改名" in rec.message and "待 harness" in rec.message for rec in caplog.records
+    ), "expected a 'rename pending harness dispatch' log line"
 
 
 def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_path):
@@ -477,25 +576,30 @@ def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_pa
 
     # Stage a rename result marking 新校 as a rename of 旧校.
     # 新校 must be a大绿本独有校 (in大绿本, not in history) for the contract.
-    rename_line = json.dumps({
-        "new_school": "新校",
-        "old_school": "旧校",
-        "confidence": 0.9,
-        "is_rename": True,
-    }, ensure_ascii=False)
+    rename_line = json.dumps(
+        {
+            "new_school": "新校",
+            "old_school": "旧校",
+            "confidence": 0.9,
+            "is_rename": True,
+        },
+        ensure_ascii=False,
+    )
     (semantic_dir / "rename_result.jsonl").write_text(
         rename_line + "\n", encoding="utf-8"
     )
 
     report = run(
-        data_dir, out_dir, with_agent_results=True, semantic_dir=semantic_dir,
+        data_dir,
+        out_dir,
+        with_agent_results=True,
+        semantic_dir=semantic_dir,
     )
     assert report["rename_applied"] is True
     assert "新校" in report["renamed_dgl_schools"]
     # 新校's dagluben row (人工智能) should carry the rename-pending log.
     rename_rows_in_main = [
-        r for r in report["main_results"]
-        if r.get("school") == "新校"
+        r for r in report["main_results"] if r.get("school") == "新校"
     ]
     assert rename_rows_in_main, "新校 row missing from main_results"
     for r in rename_rows_in_main:
@@ -532,7 +636,11 @@ _OUTPUT_HEADER_T = "近三年线差标准差"
 # columns. We read all 5 by header name so a column re-order cannot silently
 # break the hierarchical-vs-flat consistency check.
 _OUTPUT_STRUCTURED_HEADERS = (
-    "匹配方式", "仅一年数据", "选科要求跨年变化", "二次复核", "原因说明",
+    "匹配方式",
+    "仅一年数据",
+    "选科要求跨年变化",
+    "二次复核",
+    "原因说明",
 )
 
 
@@ -567,12 +675,14 @@ def _read_output_major_rows(path: Path) -> list[dict]:
             h: (row[idx] if idx < len(row) else None)
             for h, idx in structured_idx.items()
         }
-        out.append({
-            "src_row_idx": row_idx_1based,
-            "school": row[3],
-            "major": name,
-            "J": row[j_idx] if j_idx < len(row) else None,
-            "T": row[t_idx] if t_idx < len(row) else None,
-            **structured,
-        })
+        out.append(
+            {
+                "src_row_idx": row_idx_1based,
+                "school": row[3],
+                "major": name,
+                "J": row[j_idx] if j_idx < len(row) else None,
+                "T": row[t_idx] if t_idx < len(row) else None,
+                **structured,
+            }
+        )
     return out
