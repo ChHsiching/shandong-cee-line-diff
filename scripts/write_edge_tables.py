@@ -92,17 +92,24 @@ def identify_new_majors(
 
 
 # 今年新增往年没有的专业.xlsx columns. 统计线差估算 / 线差标准差估算 may be None
-# (level 2 / no compatible T); 退化级别 0/1/2.
+# (level 2 / no compatible T); 估算方式 = level 映射成大白话.
 _NEW_MAJOR_HEADER: tuple[str, ...] = (
     "学校",
     "专业",
     "选科",
     "统计线差估算",
     "线差标准差估算",
-    "退化级别",
-    "样本量",
-    "日志",
+    "估算方式",
+    "用了几条往年数据",
+    "说明",
 )
+
+# level int → 大白话估算方式（#13：不暴露内部 level 编号）.
+_LEVEL_LABELS: dict[int, str] = {
+    0: "同校同选科均值",
+    1: "同校全专业均值",
+    2: "无法估算（新校无历史）",
+}
 
 # Map record dict keys (from write_new_major_table input) to header labels.
 _NEW_MAJOR_KEY_TO_HEADER = {
@@ -111,9 +118,9 @@ _NEW_MAJOR_KEY_TO_HEADER = {
     "subject": "选科",
     "value": "统计线差估算",
     "T": "线差标准差估算",
-    "level": "退化级别",
-    "n": "样本量",
-    "log": "日志",
+    "level": "估算方式",
+    "n": "用了几条往年数据",
+    "log": "说明",
 }
 
 
@@ -146,7 +153,7 @@ def write_new_major_table(
                 record.get("subject", ""),
                 record.get("value"),
                 record.get("T"),
-                record.get("level"),
+                _LEVEL_LABELS.get(record.get("level"), record.get("level")),
                 record.get("n"),
                 record.get("log", ""),
             ]
@@ -193,7 +200,7 @@ _DELETED_HEADER: tuple[str, ...] = (
     "专业",
     "近三年统计线差",
     "近三年线差标准差",
-    "日志",
+    "说明",
 )
 
 
@@ -213,7 +220,7 @@ def write_deleted_major_table(
             "专业": r.get("major", ""),
             "近三年统计线差": r.get("J"),
             "近三年线差标准差": r.get("T"),
-            "日志": r.get("log", ""),
+            "说明": r.get("log", ""),
         }
         for r in deleted
     ]
@@ -223,12 +230,10 @@ def write_deleted_major_table(
 # --- 学校改名表 -------------------------------------------------------------
 
 _RENAME_HEADER: tuple[str, ...] = (
-    "2026新校名",
-    "候选旧校名",
-    "置信度",
-    "2026本科专业数",
-    "备注",
-    "人工已核验",
+    "新校名",
+    "原校名",
+    "今年本科专业数",
+    "说明（含官方来源）",
 )
 
 
@@ -243,12 +248,10 @@ def write_rename_table(rename_rows: Sequence[RenameRow], out_path: str | Path) -
     directly left every cell empty (field name ≠ header name)."""
     rows = [
         {
-            "2026新校名": r.get("new_school", ""),
-            "候选旧校名": r.get("old_school") or "",
-            "置信度": r.get("confidence", ""),
-            "2026本科专业数": r.get("major_count_2026", 0),
-            "备注": r.get("remark") or "",
-            "人工已核验": bool(r.get("manual_reviewed", False)),
+            "新校名": r.get("new_school", ""),
+            "原校名": r.get("old_school") or "",
+            "今年本科专业数": r.get("major_count_2026", 0),
+            "说明（含官方来源）": r.get("remark") or "",
         }
         for r in rename_rows
     ]
@@ -257,7 +260,7 @@ def write_rename_table(rename_rows: Sequence[RenameRow], out_path: str | Path) -
 
 # --- 新增校表 (未配对的大绿本独有校) ----------------------------------------
 
-_NEW_SCHOOL_HEADER: tuple[str, ...] = ("2026新校名", "2026本科专业数", "日志")
+_NEW_SCHOOL_HEADER: tuple[str, ...] = ("新校名", "今年本科专业数", "说明")
 
 
 def write_new_school_table(
@@ -268,9 +271,9 @@ def write_new_school_table(
     "major_count_2026": int}``; the log is fixed."""
     rows = [
         {
-            "2026新校名": r.get("new_school", r.get("school", "")),
-            "2026本科专业数": r.get("major_count_2026", r.get("count", 0)),
-            "日志": "2026 新增校，近三年无招生",
+            "新校名": r.get("new_school", r.get("school", "")),
+            "今年本科专业数": r.get("major_count_2026", r.get("count", 0)),
+            "说明": "2026 新增校，近三年无招生",
         }
         for r in new_schools
     ]
@@ -279,7 +282,7 @@ def write_new_school_table(
 
 # --- 停招消失校表 (未配对的历史独有校) --------------------------------------
 
-_GONE_SCHOOL_HEADER: tuple[str, ...] = ("历史旧校名", "日志")
+_GONE_SCHOOL_HEADER: tuple[str, ...] = ("历史旧校名", "说明")
 
 
 def write_gone_school_table(
@@ -290,7 +293,7 @@ def write_gone_school_table(
     rows = [
         {
             "历史旧校名": r.get("old_school", r.get("school", "")),
-            "日志": "学校未在 2026 招生",
+            "说明": "学校未在 2026 招生",
         }
         for r in gone_schools
     ]
@@ -307,7 +310,7 @@ _SPECIAL_HEADER: tuple[str, ...] = (
     "核心名",
     "选科",
     "批次",
-    "日志",
+    "原因说明",
 )
 
 
@@ -329,7 +332,7 @@ def write_special_table(
             "核心名": r.get("core", ""),
             "选科": r.get("subject", ""),
             "批次": r.get("batch", ""),
-            "日志": r.get("log", ""),
+            "原因说明": r.get("log", ""),
         }
         for r in special_rows
     ]

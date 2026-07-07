@@ -53,7 +53,7 @@ def test_write_deleted_major_table(tmp_path: Path) -> None:
     write_deleted_major_table(rows, out)
     data = _load(out)
     assert data[0][0] == "学校"
-    assert "日志" in data[0]
+    assert "说明" in data[0]
     assert data[1][2] == "旧专业"
     assert data[1][5] == "近三年有、2026 大绿本无"
 
@@ -70,7 +70,7 @@ def test_write_deleted_major_table_empty(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_write_rename_table_has_manual_reviewed_column(tmp_path: Path) -> None:
+def test_write_rename_table_columns(tmp_path: Path) -> None:
     rows = [
         {
             "new_school": "新大学",
@@ -84,11 +84,15 @@ def test_write_rename_table_has_manual_reviewed_column(tmp_path: Path) -> None:
     out = tmp_path / "学校改名表.xlsx"
     write_rename_table(rows, out)
     data = _load(out)
-    # v2 幂等契约: manual_reviewed 必须作为可见列。
-    assert "人工已核验" in data[0]
-    assert "备注" in data[0]
+    # #13: 删置信度/人工已核验（黑话），列名大白话。manual_reviewed 仍是
+    # RenameRow 字段（merge_remark 幂等用），只是不再作为可见列。
+    assert "新校名" in data[0]
+    assert "原校名" in data[0]
+    assert "说明（含官方来源）" in data[0]
+    assert "人工已核验" not in data[0]
+    assert "置信度" not in data[0]
     assert data[1][0] == "新大学"
-    assert data[1][3] == 5
+    assert data[1][2] == 5  # 今年本科专业数
 
 
 def test_write_rename_table_empty(tmp_path: Path) -> None:
@@ -117,19 +121,15 @@ def test_write_rename_table_maps_field_names_to_columns(tmp_path: Path) -> None:
     write_rename_table(rows, out)
     data = _load(out)
     assert data[0] == (
-        "2026新校名",
-        "候选旧校名",
-        "置信度",
-        "2026本科专业数",
-        "备注",
-        "人工已核验",
+        "新校名",
+        "原校名",
+        "今年本科专业数",
+        "说明（含官方来源）",
     )
-    assert data[1][0] == "新大学"  # 2026新校名 ← new_school
-    assert data[1][1] == "旧大学"  # 候选旧校名 ← old_school
-    assert data[1][2] == 0.9  # 置信度 ← confidence
-    assert data[1][3] == 5  # 2026本科专业数 ← major_count_2026
-    assert data[1][4] == "网查：2026由旧大学更名"  # 备注 ← remark
-    assert data[1][5] is False  # 人工已核验 ← manual_reviewed
+    assert data[1][0] == "新大学"  # 新校名 ← new_school
+    assert data[1][1] == "旧大学"  # 原校名 ← old_school
+    assert data[1][2] == 5  # 今年本科专业数 ← major_count_2026
+    assert data[1][3] == "网查：2026由旧大学更名"  # 说明 ← remark
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ def test_write_new_school_table(tmp_path: Path) -> None:
     out = tmp_path / "今年新招生的学校.xlsx"
     write_new_school_table(rows, out)
     data = _load(out)
-    assert data[0][0] == "2026新校名"
+    assert data[0][0] == "新校名"
     assert data[1][0] == "全新大学"
     assert data[1][1] == 3
 

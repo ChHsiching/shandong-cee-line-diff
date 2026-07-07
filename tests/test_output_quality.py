@@ -275,13 +275,11 @@ def test_write_rename_table_maps_fields_to_columns(tmp_path: Path) -> None:
     out = tmp_path / "改名.xlsx"
     write_rename_table(rows, out)
     data = _load_xlsx(out)
-    # header order: 2026新校名 / 候选旧校名 / 置信度 / 2026本科专业数 / 备注 / 人工已核验
+    # header: 新校名 / 原校名 / 今年本科专业数 / 说明（含官方来源）
     assert data[1][0] == "新大学"
     assert data[1][1] == "旧大学"
-    assert data[1][2] == 0.88
-    assert data[1][3] == 12
-    assert data[1][4] == "网查：2026 由旧大学更名"
-    assert data[1][5] is True
+    assert data[1][2] == 12
+    assert data[1][3] == "网查：2026 由旧大学更名"
 
 
 def test_write_new_school_table_maps_fields_to_columns(tmp_path: Path) -> None:
@@ -329,12 +327,12 @@ def test_write_new_major_table_maps_fields_to_columns(tmp_path: Path) -> None:
     out = tmp_path / "今年新增往年没有的专业.xlsx"
     write_new_major_table(rows, out)
     data = _load_xlsx(out)
-    # header: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 退化级别 / 样本量 / 日志
+    # header: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 估算方式 / 用了几条往年数据 / 说明
     assert data[1][0] == "新大学"
     assert data[1][1] == "人工智能"
     assert data[1][2] == "物理和化学"
     assert data[1][3] == 88.5
     assert data[1][4] == 6.25
-    assert data[1][5] == 0
+    assert data[1][5] == "同校同选科均值"  # level 0 → 大白话（#13）
     assert data[1][6] == 3
     assert "新增专业" in data[1][7]

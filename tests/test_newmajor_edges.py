@@ -123,21 +123,21 @@ def test_write_new_major_table_writes_estimate_and_level_and_log(
     wb.close()
 
     header = all_rows[0]
-    # 关键列必须存在 (V5-1: 线差标准差估算 新增).
+    # 关键列必须存在 (V5-1: 线差标准差估算; #13: 退化级别→估算方式, 样本量→用了几条往年数据, 日志→说明).
     assert "统计线差估算" in header
     assert "线差标准差估算" in header
-    assert "退化级别" in header
-    assert "样本量" in header
-    assert "日志" in header
+    assert "估算方式" in header
+    assert "用了几条往年数据" in header
+    assert "说明" in header
 
     data = all_rows[1:]
     assert len(data) == 2
     assert data[0][header.index("统计线差估算")] == 80.0
     assert data[0][header.index("线差标准差估算")] == 12.5
-    assert data[0][header.index("退化级别")] == 0
+    assert data[0][header.index("估算方式")] == "同校同选科均值"  # level 0
     assert data[1][header.index("统计线差估算")] is None
     assert data[1][header.index("线差标准差估算")] is None
-    assert data[1][header.index("退化级别")] == 2
+    assert data[1][header.index("估算方式")] == "无法估算（新校无历史）"  # level 2
 
 
 def test_write_new_major_table_empty_input_still_writes_header(
