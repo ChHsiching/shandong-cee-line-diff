@@ -26,6 +26,7 @@ from scripts.constants import (
     BATCH_EARLY_B,
     FLIGHT_BATCH,
     J3_BATCH,
+    J3_BATCH_EARLY,
     J3_BATCH_REGULAR,
     J3_BRACKET,
     J3_MAJORNAME,
@@ -86,18 +87,18 @@ def _to_float(v) -> float | None:
 
 
 def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
-    """Filter近三年 rows down to常规批一段线本科 and normalise fields.
+    """Filter近三年 rows: 常规批一段线 + 提前批（J3 已统计的，用现成 J/T）.
 
-    Excludes常规批二段线 and any row whose remarks/bracket carries the专科
-    keyword (近三年 seg1 is本科 by口径, but defensive — vocational pollution
-    must never leak into the本科 matching pool).
+    J3 提前批（825 行）带现成线差/标准差，直接用——TQ 补充表里 J3 没统计到的
+    提前批才由 build_history_early 现场算。Excludes常规批二段线 + 专科行
+    （defensive——专科绝不能漏进本科匹配池）。
     """
     out: list[HistoryRow] = []
     for row in rows:
         if _is_header(row):
             continue
         batch = _cell(row, J3_BATCH)
-        if batch != J3_BATCH_REGULAR:
+        if batch not in (J3_BATCH_REGULAR, J3_BATCH_EARLY):
             continue
         # Drop rows that carry the专科 keyword in remarks or bracket content.
         if _looks_zhuanke(_cell(row, J3_REMARKS), _cell(row, J3_BRACKET)):
@@ -123,7 +124,7 @@ def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
                 subject=subject,
                 J=j,
                 T=t,
-                source_table=J3_BATCH_REGULAR,
+                source_table=batch,
             )
         )
     return out

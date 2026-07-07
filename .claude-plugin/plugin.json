@@ -1,6 +1,6 @@
 {
   "name": "shandong-cee-line-diff",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "山东高考录取数据整理——把今年的大绿本招生计划和往年录取线差按专业匹配，给每个专业补上线差和标准差。Annual reuse; auto-asks 一段线/scope.",
   "author": { "name": "ChHsiching" },
   "homepage": "https://github.com/ChHsiching/shandong-cee-line-diff",

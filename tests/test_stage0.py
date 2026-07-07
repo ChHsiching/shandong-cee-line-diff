@@ -23,7 +23,7 @@ def _j3_rows(rows: list[tuple]) -> list[tuple]:
     return [tuple(list(r) + [None] * (width - len(r))) for r in rows]
 
 
-def test_build_history_regular_filters_one_batch_only():
+def test_build_history_regular_keeps_regular_and_early_drops_seg2():
     rows = _j3_rows(
         [
             # header
@@ -74,7 +74,7 @@ def test_build_history_regular_filters_one_batch_only():
                 10,
                 10,
             ),
-            # 提前批 — dropped (not in this builder's scope)
+            # 提前批 — kept（J3 提前批带现成线差，直接用；只有 TQ 补充表才现场算）
             (
                 "提前批",
                 "D3",
@@ -93,16 +93,13 @@ def test_build_history_regular_filters_one_batch_only():
         ]
     )
     out = stage0_merge.build_history_regular(rows)
-    assert len(out) == 1
-    row = out[0]
-    assert row["school"] == "北京大学"
-    assert row["school_cat"] == ""
-    assert row["major"] == "数学"
-    assert row["stripped"] == "数学"
-    assert row["core"] == "数学"
-    assert row["J"] == 60.0
-    assert row["T"] is None  # column T (idx 19) was None
-    assert row["source_table"] == "常规批一段线"
+    assert len(out) == 2  # 常规批一段线 + 提前批（二段线 dropped）
+    by_school = {r["school"]: r for r in out}
+    assert "北京大学" in by_school  # 常规批一段线
+    assert "Y大学" in by_school  # 提前批
+    assert by_school["北京大学"]["source_table"] == "常规批一段线"
+    assert by_school["Y大学"]["source_table"] == "提前批"
+    assert by_school["Y大学"]["J"] == 50.0  # 现成线差，直接用
 
 
 def test_build_history_regular_splits_category_from_school_name():
@@ -791,7 +788,7 @@ class TestStage0Smoke:
         finally:
             wb.close()
         built = stage0_merge.build_history_regular(rows)
-        assert len(built) == 28269
+        assert len(built) == 29093  # 常规批一段 28269 + J3 提前批 824（现成线差，用）
 
     def test_smoke_dagluben_regular_major_row_count(self, repo_root: Path):
         from scripts import io_source
@@ -821,7 +818,7 @@ class TestStage0Smoke:
         assert len(built) == 1707
 
     def test_smoke_unified_history_row_count(self, repo_root: Path):
-        """统一历史表 = 常规批一段 28269 + 提前批 1707 ≈ 29976 (±50 per plan)."""
+        """统一历史表 = J3(常规批一段 28269 + 提前批 824 = 29093) + TQ 提前批 1707 = 30800."""
         from scripts import io_source
 
         wb_j3 = io_source.load_source(
@@ -839,4 +836,4 @@ class TestStage0Smoke:
         finally:
             wb_tq.close()
         unified = stage0_merge.build_unified_history(rows_j3, rows_tq)
-        assert 29976 - 50 <= len(unified) <= 29976 + 50
+        assert 30800 - 50 <= len(unified) <= 30800 + 50
