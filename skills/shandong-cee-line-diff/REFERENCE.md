@@ -110,6 +110,24 @@ exit 0 才算完成。检查内容：
     --supplement-low-cols 2025=10,2024=14,2023=18
 ```
 
+## 怎么跑 pipeline（开箱即用）
+
+pipeline 代码（`scripts/`）在 **plugin 根**（本 skill 目录的上两级）。Claude Code 装 plugin 不带 Python 依赖，第一次用要 setup：
+
+```bash
+# 在工作目录（数据 data/ 所在）：
+PLUGIN_ROOT=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | head -1))))
+python3 -m venv .venv && .venv/bin/pip install -q openpyxl   # 一次 setup
+```
+
+之后所有 pipeline 命令加 `PYTHONPATH=$PLUGIN_ROOT` 前缀（scripts 在 plugin 根，不在工作目录）：
+
+```bash
+PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match
+```
+
+查任何产出 xlsx：`PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.show_table output/<表>.xlsx --head 20`
+
 ## 管线串联命令
 
 跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）：
