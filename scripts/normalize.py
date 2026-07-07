@@ -35,7 +35,9 @@ __all__ = [
 # A bracket group is (...) — after nfk, full-width parens are already half-width.
 _BRACKET_RE = re.compile(r"\(([^()]*)\)")
 # Gender marker is recognised as a standalone 男 or 女 token inside a bracket.
-_GENDER_RE = re.compile(r"^[男女]$|^[男女][,，、]|[,，、][男女]$|[,，、][男女][,，、]")
+_GENDER_RE = re.compile(
+    r"^[男女]$|^[男女][,，、]|[,，、][男女]$|[,，、][男女][,，、]|招[男女]生"
+)
 
 
 def nfk(s: str) -> str:

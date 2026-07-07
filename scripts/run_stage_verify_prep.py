@@ -14,7 +14,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from scripts.models import HistoryRow
+from scripts.constants import LOG_COARSE_CANDIDATE, LOG_SEMANTIC_PREFIX
 from scripts.run_pipeline import run
 from scripts.verify_judgment import build_verify_batches, write_verify_prompts
 
@@ -72,19 +72,9 @@ def main() -> int:
 
     main_results = report["main_results"]
     dagluben_rows = report["dagluben_rows"]
-    # History lives in the intermediate CSV; re-run build_unified_history from
-    # the same source to avoid coupling to CSV layout. For prompt generation we
-    # only need candidate identification — pass dagluben as the row source.
-    # build_verify_batches needs history to locate matched candidates; we read
-    # it from the intermediate unified-history CSV that run() already wrote.
-    import csv
-
-    hist_csv = Path("intermediate") / "s2_unified_history.csv"
-    history: list[HistoryRow] = []
-    if hist_csv.exists():
-        with hist_csv.open(encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
-                history.append(_coerce_history(row))
+    # build_verify_batches needs history to locate matched candidates; run()
+    # returns it directly (Bug #2 fix — was reading a CSV that nobody writes).
+    history = report.get("history", [])
 
     # Filter judgmental matches (V5-0): coarse + agent-semantic matched rows.
     judgmental = [r for r in main_results if _is_judgmental(r)]
@@ -98,8 +88,12 @@ def main() -> int:
     paths = write_verify_prompts(batches, args.semantic_dir)
 
     # Report by prior-stage来源.
-    coarse_n = sum(1 for r in judgmental if r.get("log", "").startswith("粗筛"))
-    semantic_n = sum(1 for r in judgmental if r.get("log", "").startswith("语义匹配"))
+    coarse_n = sum(
+        1 for r in judgmental if r.get("log", "").startswith(LOG_COARSE_CANDIDATE)
+    )
+    semantic_n = sum(
+        1 for r in judgmental if r.get("log", "").startswith(LOG_SEMANTIC_PREFIX)
+    )
     print("=== 判断型二次复核 prep 完成 ===")
     print(f"判断型匹配总数: {len(judgmental)}")
     print(f"  粗筛(核心名唯一/消歧): {coarse_n}")
@@ -116,31 +110,7 @@ def _is_judgmental(match: dict) -> bool:
     if not match.get("matched"):
         return False
     log = match.get("log", "")
-    return log.startswith("粗筛") or log.startswith("语义匹配")
-
-
-def _coerce_history(row: dict) -> HistoryRow:
-    """Coerce a CSV dict row into a typed HistoryRow (J/T → float|None)."""
-
-    def _num(v: str) -> float | None:
-        if v is None or v.strip() == "":
-            return None
-        try:
-            return float(v)
-        except ValueError:
-            return None
-
-    return HistoryRow(
-        school=row.get("school", ""),
-        school_cat=row.get("school_cat", ""),
-        major=row.get("major", ""),
-        stripped=row.get("stripped", ""),
-        core=row.get("core", ""),
-        subject=row.get("subject", ""),
-        J=_num(row.get("J", "")),
-        T=_num(row.get("T", "")),
-        source_table=row.get("source_table", ""),
-    )
+    return log.startswith(LOG_COARSE_CANDIDATE) or log.startswith(LOG_SEMANTIC_PREFIX)
 
 
 if __name__ == "__main__":

@@ -705,6 +705,7 @@ def run(
         "dagluben_indices": dgl_indices,
         "dagluben_rows": dagluben,
         "main_results": main_results,
+        "history": history,
         "new_major_rows": new_major_rows,
         "post_coarse_unmatched_indices": [
             d["src_row_idx"] for d in post_coarse_unmatched

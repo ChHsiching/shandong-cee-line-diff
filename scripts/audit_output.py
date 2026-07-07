@@ -183,13 +183,13 @@ def _load_verify_verdicts(semantic_dir: Path) -> dict[int, str] | None:
 
 def _history_index(
     history: Sequence[dict[str, Any]],
-) -> dict[tuple[str, str], dict[str, Any]]:
-    """Index history rows by (school, major) for J/T comparison in check 4."""
-    idx: dict[tuple[str, str], dict[str, Any]] = {}
+) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """Index history rows by (school, major) → list of rows (Bug #3 fix:
+    same school+major can carry multiple 招生类别 with different J/T)."""
+    idx: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for h in history:
         key = (h.get("school", ""), h.get("major", ""))
-        if key not in idx:
-            idx[key] = h
+        idx.setdefault(key, []).append(h)
     return idx
 
 
@@ -398,15 +398,17 @@ def _check4_jt_consistency(
         major = str(row[COL_MAJOR_NAME - 1] or "")
         out_j = row[COL_J - 1]
         out_t = row[COL_T - 1]
-        h = hist_idx.get((school, major))
-        if h is None:
+        hs = hist_idx.get((school, major))
+        if not hs:
             # Cannot locate history — skip (not a J/T mismatch per se).
             continue
-        if not _close(out_j, h.get("J")):
-            mismatches.append(f"matched J {school}/{major}: {out_j}≠{h.get('J')}")
-            continue
-        if not _close(out_t, h.get("T")):
-            mismatches.append(f"matched T {school}/{major}: {out_t}≠{h.get('T')}")
+        # Bug #3: same (school, major) may have multiple 招生类别 rows (普通/公安/
+        # 师范) with different J/T — output matches if it hits ANY of them.
+        if not any(_close(out_j, h.get("J")) and _close(out_t, h.get("T")) for h in hs):
+            mismatches.append(
+                f"matched J/T {school}/{major}: {out_j}/{out_t}≠"
+                f"{[(h.get('J'), h.get('T')) for h in hs]}"
+            )
 
     for row in sample_estimate:
         school = str(row[COL_SCHOOL - 1] or "")
