@@ -68,7 +68,7 @@
 完成前必须跑：
 
 ```bash
-.venv/bin/python -m scripts.audit_output \
+PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output \
     --output-dir output --data-dir data \
     --intermediate-dir intermediate --semantic-dir semantic-match
 ```
@@ -103,7 +103,7 @@ exit 0 才算完成。检查内容：
 
 例：明年大绿本改名 + 一段线变 + 补充表批次名不同：
 ```
-.venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output \
+PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output \
     --dl-file 山东省2027年大绿本招生计划.xlsx \
     --one-line 2025=440,2024=442,2023=439 \
     --supplement-batches 提前批A,提前批B \
@@ -112,44 +112,47 @@ exit 0 才算完成。检查内容：
 
 ## 怎么跑 pipeline（开箱即用）
 
-pipeline 代码（`scripts/`）在 **plugin 根**（本 skill 目录的上两级）。Claude Code 装 plugin 不带 Python 依赖，第一次用要 setup：
+plugin 自带 SessionStart hook，**新开 session 自动建好 Python venv + openpyxl**（在 plugin 根 `.venv`）。agent 不用自己建 venv。
 
+定位 plugin 根 $P（含 scripts/ + .venv）：
 ```bash
-# 在工作目录（数据 data/ 所在）：
-PLUGIN_ROOT=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1))))
-python3 -m venv .venv && .venv/bin/pip install -q openpyxl   # 一次 setup
+P=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1))))
 ```
 
-之后所有 pipeline 命令加 `PYTHONPATH=$PLUGIN_ROOT` 前缀（scripts 在 plugin 根，不在工作目录）：
-
+跑 pipeline（`PYTHONPATH=$P` 前缀 + plugin venv python）：
 ```bash
-PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match
+PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match
 ```
 
-查任何产出 xlsx：`PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.show_table output/<表>.xlsx --head 20`
+查任何产出 xlsx：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.show_table output/<表>.xlsx --head 20`
+
+**如果 `$P/.venv` 不存在**（hook 没跑成，如 python3 缺失），fallback 手动建一次：
+```bash
+python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
+```
 
 ## 管线串联命令
 
-跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）。**所有命令加 `PYTHONPATH=$PLUGIN_ROOT` 前缀**（见上「怎么跑 pipeline」）。
+跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）。**所有命令加 `PYTHONPATH=$P` 前缀**（见上「怎么跑 pipeline」）。
 
 **关键顺序：改名必须早于语义匹配**——改名校的专业在改名前的 batch 里会拿到空候选（旧校名 history 还没并入新校名）。所以先派改名 agent、apply 后重生成 batch，再派语义 agent。
 
 1. **第一次跑管线**（写出 batch prompt + 改名候选，不 apply）：
-   `PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match`
+   `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match`
    → 严格匹配 + **无改名的** Stage2 batch prompt（改名校这时空候选，正常）+ 改名候选。
 2. **派 agent 跑改名配对**（先于语义！）：读 `semantic-match/rename_prompt.md` + `rename_candidates.jsonl`，派 subagent 网查每所消失/新增校，结果写 `semantic-match/rename_result.jsonl`（每行 `{new_school, old_school, confidence, is_rename}`）；网查详情写 `research/<校名>.md`。
 3. **第二次跑管线**（apply 改名 → 重生成改名感知 batch）：
-   `PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
+   `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → 旧校名 history 并入新校名，**改名校的专业这次有候选了**，Stage2 batch prompt 重新生成（改名感知）。
 4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`，每批派 subagent（**并发 ≤6**，多了触发 429），结果写 `semantic-match/batch_NN_result.jsonl`（每行 `{src_row_idx, school, major, match, J, T, reason}`）。**注意**：major/reason 字段若含双引号须转义 `\"`（专业名如「法学类(...)(含"法学+英语"...)」），否则 JSON 非法。
 5. **第三次跑管线**（apply 语义结果，产出 verify prompt）：
-   `PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
+   `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
 6. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`，派 subagent（并发 ≤6），结果写 `semantic-match/verify_batch_NN_result.jsonl`（每行 `{src_row_idx, verdict, reason}`）。
 7. **第四次跑管线**（apply 复核结果，产出最终 8 张表）：
-   `PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
-8. **跑审计**：`PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
+   `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
+8. **跑审计**：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
 
-每一步查中间结果用 `PYTHONPATH=$PLUGIN_ROOT .venv/bin/python -m scripts.show_table output/<表>.xlsx [--head N] [--grep 词]`。
+每一步查中间结果用 `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.show_table output/<表>.xlsx [--head N] [--grep 词]`。
 
 ## 故障排查
 
