@@ -1,14 +1,11 @@
 """Slice B orchestration (coverage-exempt) — extract judgmental matches into
 verification batches.
 
-Per Plan v2 Slice B: drives the deterministic pipeline chain to recover the
-current ``main_results``, filters the judgmental matches (coarse 核心名唯一/
-消歧 + agent 语义 matched, per V5-0), and writes ``semantic-match/
-verify_batch_NN.json`` (20/batch) for harness-side agent dispatch.
-
-This mirrors :mod:`scripts.run_stage2_prep`: pure orchestration, no pipeline
-feature — hence coverage-exempt (see ``.coveragerc``). Expected full-scale
-count ~5500 (coarse ~4775 + agent semantic ~763) → ~275 batches.
+Drives the deterministic pipeline chain to recover the current
+``main_results``, filters the judgmental matches (agent 语义 matched, per
+V5-0), and writes ``semantic-match/verify_batch_NN.json`` (20/batch) for
+harness-side agent dispatch. Pure orchestration, no pipeline feature — hence
+coverage-exempt (see ``.coveragerc``).
 """
 
 from __future__ import annotations

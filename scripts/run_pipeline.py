@@ -620,7 +620,9 @@ def run(
     ]
     flight = [d for d in remaining_unmatched if d.get("batch") == FLIGHT_BATCH]
     other = [d for d in remaining_unmatched if d.get("batch") != FLIGHT_BATCH]
-    special_rows = flight_and_special(flight, other, demoted_map=demoted_map)
+    special_rows = flight_and_special(
+        flight, other, demoted_map=demoted_map, history=history
+    )
     write_special_table(special_rows, out_dir / "未能匹配的专业.xlsx")
 
     # --- Outputs (hierarchical + flat, same MatchResult source) ------------

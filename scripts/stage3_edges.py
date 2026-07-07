@@ -17,8 +17,7 @@ Note on被删 2026-缺判定: :func:`deleted_majors` operates on the history poo
 plus a ``dgl_present`` set (which schools exist in 2026). The「2026 缺该专业」
 reduction is the caller's responsibility (it has the大绿本 专业集合); this
 function returns the history rows whose school is present but is NOT renamed,
-so the caller can subtract the大绿本 专业集合 to find true被删. See
-``run_rename_smoke.py`` for the full reduction.
+so the caller can subtract the大绿本 专业集合 to find true被删.
 """
 
 from __future__ import annotations
@@ -137,10 +136,29 @@ def deleted_majors(
 # ---------------------------------------------------------------------------
 
 
+def _unmatched_log(d: DaglubenRow, history: Sequence[HistoryRow]) -> str:
+    """#17: 写具体的无法匹配原因，不笼统。同校同核心名有候选时列出，否则只给 core。"""
+    school = d.get("school", "")
+    core = d.get("core", "") or d.get("major", "")
+    cands = [
+        h.get("major", "")
+        for h in history
+        if h.get("school", "") == school and h.get("core", "") == d.get("core", "")
+    ]
+    if cands:
+        brief = "/".join(cands[:3]) + ("…" if len(cands) > 3 else "")
+        return (
+            f"没找到能匹配的往年专业：同校同核心名有 {len(cands)} 个"
+            f"（{brief}），今年的方向和这些都对不上"
+        )
+    return f"没找到能匹配的往年专业：{core}"
+
+
 def flight_and_special(
     flight_unmatched: Sequence[DaglubenRow],
     other_unmatched: Sequence[DaglubenRow],
     demoted_map: dict[int, str] | None = None,
+    history: Sequence[HistoryRow] | None = None,
 ) -> list[EdgeRow]:
     """Route flight(军队) and remaining-unmatched大绿本 rows to the特殊表.
 
@@ -151,9 +169,9 @@ def flight_and_special(
         in the提前批 pool. Per spec §6 Stage 3 they go to the特殊表 with log
         ``飞行技术(军队)，提前批池匹配不成``.
     other_unmatched
-        Remaining大绿本 rows that survived Stage 1/1.5/2 + new-major + rename
+        Remaining大绿本 rows that survived Stage 1/2 + new-major + rename
         classification without a home — unclassifiable edge cases. Log:
-        ``无法匹配：<原因>``.
+        ``没找到能匹配的往年专业：<具体原因>`` (#17: 同校同核心名候选摘要).
     demoted_map
         Plan v2 阻断2: ``{src_row_idx: reason}`` for rows the V5-0 second-pass
         verification judged存疑. Such rows carry log ``复核存疑：<原因>``
@@ -193,7 +211,7 @@ def flight_and_special(
         if idx in demoted_map:
             log = f"{LOG_VERIFY_DEMOTE_PREFIX}：{demoted_map[idx]}"
         else:
-            log = f"没找到能匹配的往年专业：{d.get('core', '') or d.get('major', '')}"
+            log = _unmatched_log(d, history or [])
         out.append(
             EdgeRow(
                 src_row_idx=idx,

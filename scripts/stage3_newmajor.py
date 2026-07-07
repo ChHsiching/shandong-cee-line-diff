@@ -17,8 +17,7 @@ years, joined by ` | `):
     any variant (itself split on 「和」 into subject atoms) ⊇ 新专业选科
     (split on 「和」) ⇒ compatible.
 
-Pure functions only — no I/O. Smoke reporting lives in
-``scripts/run_newmajor_smoke.py``.
+Pure functions only — no I/O.
 """
 
 from __future__ import annotations
