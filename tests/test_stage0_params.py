@@ -73,3 +73,24 @@ def test_build_history_early_defaults_match_current_behavior() -> None:
     out = stage0_merge.build_history_early(rows)  # 全默认
     assert len(out) == 2
     assert all(r["J"] is not None for r in out)  # 线差都算出来了
+
+
+def test_build_dagluben_early_batches_override() -> None:
+    """#9: build_dagluben_early batches 参数覆盖（大绿本批次名变化时）。"""
+    from scripts.constants import BATCH_EARLY_A
+
+    def _dl_row(batch: str) -> tuple:
+        row = [""] * 12
+        row[0] = batch
+        row[3] = "X大学"
+        row[4] = "01"  # 代号
+        row[5] = "数学"  # 名称
+        return tuple(row)
+
+    rows = [_dl_row(BATCH_EARLY_A), _dl_row("自定义特殊批")]
+    out_default = stage0_merge.build_dagluben_early(rows)
+    assert len(out_default) == 1  # 默认只取 提前批 A/B + 飞行
+    out_override = stage0_merge.build_dagluben_early(
+        rows, batches=frozenset({BATCH_EARLY_A, "自定义特殊批"})
+    )
+    assert len(out_override) == 2  # override 含「自定义特殊批」

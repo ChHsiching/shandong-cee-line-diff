@@ -265,7 +265,10 @@ def build_dagluben_regular(rows: Iterable[Sequence]) -> list[DaglubenRow]:
     return out
 
 
-def build_dagluben_early(rows: Iterable[Sequence]) -> list[DaglubenRow]:
+def build_dagluben_early(
+    rows: Iterable[Sequence],
+    batches: frozenset[str] | None = None,
+) -> list[DaglubenRow]:
     """Extract大绿本 提前批 A类 + B类 本科专业 rows into one merged pool.
 
     Spec §3 / §4.2: AB 类无差别, merged into a single matching pool whose
@@ -273,13 +276,10 @@ def build_dagluben_early(rows: Iterable[Sequence]) -> list[DaglubenRow]:
     keys against the提前批 history pool built by :func:`build_history_early`.
 
     专业行 = 代号(E, idx4) and 名称(F, idx5) both non-empty. Subtitles carrying
-    the专科 keyword are excluded — the 181 ``定向培养军士生(专科)`` rows in B类
-    are vocational and dropped (spec §3: 专科全排除), yielding 1139 + 446 + 2(飞行) = 1587
-    early-batch本科 majors.
+    the专科 keyword are excluded. ``batches`` 参数化（默认提前批 A/B + 飞行；
+    大绿本批次命名变化时覆盖，不用改代码）。
     """
-    early_batches: frozenset[str] = frozenset(
-        {BATCH_EARLY_A, BATCH_EARLY_B, FLIGHT_BATCH}
-    )
+    early_batches = batches or frozenset({BATCH_EARLY_A, BATCH_EARLY_B, FLIGHT_BATCH})
     out: list[DaglubenRow] = []
     for row_idx, row in enumerate(rows, start=1):
         if _is_header(row):

@@ -372,6 +372,8 @@ def run(
     one_line: dict[int, int] | None = None,
     supplement_batches: frozenset[str] | None = None,
     supplement_low_cols: dict[int, int] | None = None,
+    dagluben_early_batches: frozenset[str] | None = None,
+    flight_batch: str | None = None,
 ) -> PipelineReport:
     """Run the deterministic admission-data pipeline end-to-end.
 
@@ -432,7 +434,7 @@ def run(
     )
     dagluben = [
         *build_dagluben_regular(dl_rows),
-        *build_dagluben_early(dl_rows),
+        *build_dagluben_early(dl_rows, batches=dagluben_early_batches),
     ]
     dgl_indices = [d["src_row_idx"] for d in dagluben]
     logger.info(
@@ -642,8 +644,9 @@ def run(
     remaining_unmatched = [
         d for d in dagluben if d["src_row_idx"] not in classified_idx
     ]
-    flight = [d for d in remaining_unmatched if d.get("batch") == FLIGHT_BATCH]
-    other = [d for d in remaining_unmatched if d.get("batch") != FLIGHT_BATCH]
+    _flight_label = flight_batch or FLIGHT_BATCH
+    flight = [d for d in remaining_unmatched if d.get("batch") == _flight_label]
+    other = [d for d in remaining_unmatched if d.get("batch") != _flight_label]
     special_rows = flight_and_special(
         flight, other, demoted_map=demoted_map, history=history
     )
@@ -789,6 +792,16 @@ def main() -> None:
         default=None,
         help="补充表低分列，格式「2025=10,2024=14,2023=18」（0 开始数）",
     )
+    parser.add_argument(
+        "--dagluben-early-batches",
+        default=None,
+        help="大绿本提前批的批次名，逗号分隔（默认 1.提前批A类,2.提前批B类,3.提前批—飞行技术(军队)）",
+    )
+    parser.add_argument(
+        "--flight-batch",
+        default=None,
+        help="飞行技术批次名（默认 3.提前批—飞行技术(军队)）",
+    )
     args = parser.parse_args()
 
     # CLI 参数化：文件名 + 一段线（覆盖模块默认，agent 传参不手写代码）。
@@ -818,6 +831,12 @@ def main() -> None:
         for pair in args.supplement_low_cols.split(","):
             year, col = pair.split("=")
             supplement_low_cols[int(year)] = int(col)
+    dagluben_early_batches = (
+        frozenset(args.dagluben_early_batches.split(","))
+        if args.dagluben_early_batches
+        else None
+    )
+    flight_batch = args.flight_batch
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -834,6 +853,8 @@ def main() -> None:
         one_line=one_line,
         supplement_batches=supplement_batches,
         supplement_low_cols=supplement_low_cols,
+        dagluben_early_batches=dagluben_early_batches,
+        flight_batch=flight_batch,
     )
 
     cov = report["coverage"]
