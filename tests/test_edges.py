@@ -126,7 +126,7 @@ def test_flight_rows_unmatched_become_special() -> None:
     # 其它行日志为「无法匹配：<原因>」。
     other = [r for r in special if r["school"] == "某大学"]
     assert len(other) == 1
-    assert "无法匹配" in other[0]["log"]
+    assert "没找到" in other[0]["log"]
 
 
 def test_flight_and_special_empty_inputs_returns_empty() -> None:

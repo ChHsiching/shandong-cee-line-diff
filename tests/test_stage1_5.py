@@ -2,11 +2,11 @@
 
 Per Plan v2 / spec §6 Stage 1.5 (prototype-validated): for Stage 1 misses,
 key candidates by ``(基础校名, 招生类别, 核心名)``.
-  - Unique candidate  -> auto-accept (log ``粗筛匹配：核心名唯一``).
+  - Unique candidate  -> auto-accept (log ``核心名匹配：核心专业名相同``).
   - Multi candidate   -> disambiguate by「近三年候选差异化括号 ⊂ 大绿本全名」
                          (性别/合作/其他 each must appear in dagluben全名);
                          exactly one compatible -> accept
-                         (log ``粗筛匹配：括号子集消歧（<简述>）``); else unmatched.
+                         (log ``核心名匹配：核心专业名相同（<简述>）``); else unmatched.
   - No candidate      -> still unmatched.
 
 Prototype实证: 大绿本 2026 名远比近三年详细, 核心名对齐即可; **禁用签名全等**.
@@ -73,7 +73,7 @@ def test_match_coarse_unique_candidate_auto_accepts():
     """实证样例: 人大「经济学类(经济学、国民经济管理、…)」 core=经济学类,
     同校同类别仅 1 候选「经济学类」 -> 自动接受.
 
-    日志 ``粗筛匹配：核心名唯一``.
+    日志 ``核心名匹配：核心专业名相同``.
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
@@ -95,7 +95,7 @@ def test_match_coarse_unique_candidate_auto_accepts():
     assert r["src_row_idx"] == 10
     assert r["J"] == 72.0
     assert r["T"] == 4.0
-    assert r["log"] == "粗筛匹配：核心名唯一"
+    assert r["log"] == "核心名匹配：核心专业名相同"
 
 
 def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
@@ -115,7 +115,7 @@ def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
-    assert accepted[0]["log"] == "粗筛匹配：核心名唯一"
+    assert accepted[0]["log"] == "核心名匹配：核心专业名相同"
     assert accepted[0]["J"] == 80.0
 
 
@@ -152,7 +152,7 @@ def test_match_coarse_multi_candidate_disambiguates_when_brackets_subset():
     r = accepted[0]
     assert r["matched"] is True
     assert r["J"] == 80.0
-    assert r["log"].startswith("粗筛匹配：括号子集消歧")
+    assert r["log"].startswith("核心名匹配：核心专业名相同")
 
 
 def test_match_coarse_multi_candidate_still_unmatched_when_ambiguous():
@@ -230,7 +230,7 @@ def test_match_coarse_no_candidate_leaves_unmatched():
 def test_match_coarse_subject_drift_does_not_block_match():
     """Spec §5.4: 选科 = 非差异化 (policy drift). Construct a dagluben row with
     选科「物理和化学」 whose unique candidate has 选科「物理」: still matches
-    because 选科 is NOT part of the core key; log appends「选科政策漂移，已忽略」.
+    because 选科 is NOT part of the core key; log appends「选科要求跨年不同，不影响匹配」.
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
@@ -245,7 +245,7 @@ def test_match_coarse_subject_drift_does_not_block_match():
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
     assert accepted[0]["matched"] is True
-    assert "选科政策漂移，已忽略" in accepted[0]["log"]
+    assert "选科要求跨年不同，不影响匹配" in accepted[0]["log"]
 
 
 def test_match_coarse_same_subject_no_drift_note():
@@ -258,7 +258,7 @@ def test_match_coarse_same_subject_no_drift_note():
             major="数学", core="数学", subject="物理和化学", src_row_idx=21),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
-    assert "选科政策漂移" not in accepted[0]["log"]
+    assert "选科要求跨年不同" not in accepted[0]["log"]
 
 
 # --- 招生类别 differentiation: different tracks never match via coarse (RED) -
@@ -358,12 +358,12 @@ class TestStage1_5Smoke:
 
 # --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
 
-SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+SINGLE_YEAR_NOTE = "（仅一年数据，无标准差）"
 
 
 def test_match_coarse_unique_single_year_history_adds_no_stddev_note():
     """A coarse unique-candidate match whose history row has T=None must
-    append the「(单年数据，无标准差)」note (V5-1)."""
+    append the「(仅一年数据，无标准差)」note (V5-1)."""
     history = [_hist(school="A大学", school_cat="", core="数学",
                      major="数学", J=60.0, T=None)]
     idx = stage1_5_coarse.build_core_idx(history)

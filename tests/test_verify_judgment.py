@@ -70,7 +70,7 @@ def _hist(school: str, major: str, core: str, j: float = 80.0, t: float | None =
     )
 
 
-def _match(idx: int, school: str, major: str, log: str = "粗筛匹配：核心名唯一") -> MatchResult:
+def _match(idx: int, school: str, major: str, log: str = "核心名匹配：核心专业名相同") -> MatchResult:
     return MatchResult(
         src_row_idx=idx,
         school=school,
@@ -100,9 +100,9 @@ def test_build_verify_batches_attaches_dagluben_candidate_and_requirement() -> N
     """Each judgmental match carries its dagluben row, the matched history
     candidate, and the judgment requirement in one VerifyBatchItem."""
     judgment_matches = [
-        _match(1, "甲大学", "投资学(量化投资)", log="粗筛匹配：核心名唯一"),
-        _match(2, "甲大学", "会计学", log="语义匹配：方向对齐"),
-        _match(3, "乙大学", "数学类", log="粗筛匹配：括号子集消歧（方向）"),
+        _match(1, "甲大学", "投资学(量化投资)", log="核心名匹配：核心专业名相同"),
+        _match(2, "甲大学", "会计学", log="agent 语义匹配：方向对齐"),
+        _match(3, "乙大学", "数学类", log="核心名匹配：核心专业名相同（方向）"),
     ]
     dagluben = [
         _dl(1, "甲大学", "投资学(量化投资)", "投资学"),
@@ -131,7 +131,7 @@ def test_build_verify_batches_attaches_dagluben_candidate_and_requirement() -> N
 def test_build_verify_batches_splits_into_batches_of_2() -> None:
     """3 judgmental matches / batch_size=2 → 2 batches (2 + 1)."""
     judgment_matches = [
-        _match(i, "甲大学", f"专业{i}", log="粗筛匹配：核心名唯一") for i in (1, 2, 3)
+        _match(i, "甲大学", f"专业{i}", log="核心名匹配：核心专业名相同") for i in (1, 2, 3)
     ]
     dagluben = [_dl(i, "甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
     history = [_hist("甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
@@ -150,10 +150,10 @@ def test_build_verify_batches_empty_input_returns_empty() -> None:
 
 def test_build_verify_batches_skips_non_judgmental_strict_matches() -> None:
     """Strict-exact matches are构造确定 — they must NOT enter verification.
-    Only matches whose log starts with 粗筛 or 语义匹配 (matched) qualify."""
+    Only matches whose log starts with 粗筛 or agent 语义匹配 (matched) qualify."""
     judgment_matches = [
         _match(1, "甲大学", "计算机", log="严格匹配：归一化专业名+招生类别一致"),
-        _match(2, "甲大学", "投资学(量化投资)", log="粗筛匹配：核心名唯一"),
+        _match(2, "甲大学", "投资学(量化投资)", log="核心名匹配：核心专业名相同"),
     ]
     dagluben = [_dl(1, "甲大学", "计算机", "计算机"), _dl(2, "甲大学", "投资学(量化投资)", "投资学")]
     history = [_hist("甲大学", "计算机", "计算机"), _hist("甲大学", "投资学", "投资学")]
@@ -170,7 +170,7 @@ def test_build_verify_batches_skips_non_judgmental_strict_matches() -> None:
 
 
 def test_write_verify_prompts_writes_one_file_per_batch(tmp_path: Path) -> None:
-    judgment_matches = [_match(i, "甲大学", f"专业{i}", "粗筛匹配：核心名唯一") for i in (1, 2, 3)]
+    judgment_matches = [_match(i, "甲大学", f"专业{i}", "核心名匹配：核心专业名相同") for i in (1, 2, 3)]
     dagluben = [_dl(i, "甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
     history = [_hist("甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
 
@@ -192,8 +192,8 @@ def test_write_verify_prompts_writes_one_file_per_batch(tmp_path: Path) -> None:
 
 def _basic_setup() -> tuple[list[MatchResult], list[DaglubenRow]]:
     matches = [
-        _match(1, "甲大学", "投资学(量化投资)", "粗筛匹配：核心名唯一"),
-        _match(2, "甲大学", "会计学", "语义匹配：方向对齐"),
+        _match(1, "甲大学", "投资学(量化投资)", "核心名匹配：核心专业名相同"),
+        _match(2, "甲大学", "会计学", "agent 语义匹配：方向对齐"),
     ]
     dagluben = [
         _dl(1, "甲大学", "投资学(量化投资)", "投资学"),
@@ -218,7 +218,7 @@ def test_apply_verify_routes_confirmed_to_confirmed_and_uncertain_to_demoted(tmp
     demoted = result["demoted"][0]
     assert demoted["core"] == "投资学"
     assert demoted["batch"] == "4.常规批"
-    assert "复核存疑" in demoted["log"]
+    assert "二次复核认为可能有误" in demoted["log"]
     # verdict_by_idx
     assert result["verdict_by_idx"] == {1: "存疑", 2: "确定"}
 

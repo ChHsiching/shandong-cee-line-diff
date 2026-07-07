@@ -189,7 +189,7 @@ def flight_and_special(
         if idx in demoted_map:
             log = f"{LOG_VERIFY_DEMOTE_PREFIX}：{demoted_map[idx]}"
         else:
-            log = f"无法匹配：剩余未归类({d.get('core', '') or d.get('major', '')})"
+            log = f"没找到能匹配的往年专业：{d.get('core', '') or d.get('major', '')}"
         out.append(
             EdgeRow(
                 src_row_idx=idx,

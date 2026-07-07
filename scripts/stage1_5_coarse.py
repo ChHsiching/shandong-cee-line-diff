@@ -17,7 +17,7 @@ For Stage 1 misses, bucket the unified history by
     more than one compatible -> still unmatched (Stage 2 territory).
 
 选科 (subject) is non-differentiated (spec §5.4): it never enters the key,
-and a mismatch logs ``选科政策漂移，已忽略`` so a reviewer can see the drift.
+and a mismatch logs ``选科要求跨年不同，不影响匹配`` so a reviewer can see the drift.
 
 招生类别 (spec §5.2 element 6) IS differentiated: 普通 vs 中外合作 etc. are
 different admission tracks with different cutoffs and so live in different
@@ -30,9 +30,9 @@ from __future__ import annotations
 from typing import Iterable
 
 from scripts.constants import (
-    LOG_COARSE_DISAMBIG_PREFIX,
-    LOG_COARSE_UNIQUE,
-    LOG_SUBJECT_DRIFT,
+    LOG_COARSE_CANDIDATE,
+    LOG_COARSE_CANDIDATE,
+    LOG_SUBJECT_NOTE,
 )
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 from scripts.normalize import diff_brackets
@@ -102,7 +102,7 @@ def _disambig_log(candidate: HistoryRow) -> str:
         # Use the first bracket's value (truncated) as the human hint.
         first_val = diffs[0][1]
         brief = first_val[:10] + ("…" if len(first_val) > 10 else "")
-    return f"{LOG_COARSE_DISAMBIG_PREFIX}（{brief}）"
+    return f"{LOG_COARSE_CANDIDATE}（{brief}）"
 
 
 def _subject_differs(dl_subject: str, hist_subject: str) -> bool:
@@ -124,7 +124,7 @@ def _accept(
     if _subject_differs(
         dagluben.get("subject", ""), candidate.get("subject", "")
     ):
-        log = f"{log}；{LOG_SUBJECT_DRIFT}"
+        log = f"{log}；{LOG_SUBJECT_NOTE}"
     note = single_year_note(candidate)
     if note:
         log = f"{log}；{note}"
@@ -167,7 +167,7 @@ def match_coarse(
             continue
 
         if len(candidates) == 1:
-            accepted.append(_accept(d, candidates[0], LOG_COARSE_UNIQUE))
+            accepted.append(_accept(d, candidates[0], LOG_COARSE_CANDIDATE))
             continue
 
         # Multi-candidate: keep only those whose differentiated brackets are

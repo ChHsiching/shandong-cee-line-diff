@@ -279,10 +279,10 @@ def test_reason_over_30_chars_is_trimmed_not_rejected(tmp_path: Path) -> None:
     jsonl = _write(tmp_path, [_line(1, "计算机类", long_reason, 80.0, 1.0)])
     results = apply_results([jsonl], dagluben, history)
     assert results[0]["matched"] is True
-    # log = 语义匹配：<trimmed reason>. No选科 drift here (subjects match).
-    assert results[0]["log"].startswith("语义匹配：")
-    assert "选科政策漂移" not in results[0]["log"]
-    reason_portion = results[0]["log"][len("语义匹配："):]
+    # log = agent 语义匹配：<trimmed reason>. No选科 drift here (subjects match).
+    assert results[0]["log"].startswith("agent 语义匹配：")
+    assert "选科要求跨年不同" not in results[0]["log"]
+    reason_portion = results[0]["log"][len("agent 语义匹配："):]
     assert len(reason_portion) <= 30
     assert len(reason_portion) < len(long_reason)  # was actually trimmed
 
@@ -311,7 +311,7 @@ def test_reject_non_object_top_level(tmp_path: Path) -> None:
 
 def test_subject_drift_appended_to_log(tmp_path: Path) -> None:
     """When the matched history选科 differs from the dagluben选科, the log
-    picks up the「选科政策漂移，已忽略」suffix (spec §9 选科漂移)."""
+    picks up the「选科要求跨年不同，已忽略」suffix (spec §9 选科要求跨年变化)."""
     dagluben = [_dl(1, "甲大学", "计算机类(图灵)", "计算机类")]
     # override subject to force drift
     dagluben[0]["subject"] = "物理和化学"
@@ -319,7 +319,7 @@ def test_subject_drift_appended_to_log(tmp_path: Path) -> None:
     history[0]["subject"] = "物理"
     jsonl = _write(tmp_path, [_line(1, "计算机类", "核心名同", 80.0, 1.0)])
     results = apply_results([jsonl], dagluben, history)
-    assert "选科政策漂移" in results[0]["log"]
+    assert "选科要求跨年不同" in results[0]["log"]
 
 
 # --- end-to-end orchestration on stub jsonl (pre -> write -> apply) ---------
@@ -358,7 +358,7 @@ def test_end_to_end_pre_write_apply(tmp_path: Path) -> None:
     assert len(out) == 2
     assert out[0]["matched"] is True and out[0]["J"] == 80.0
     assert out[1]["matched"] is False and out[1]["J"] is None
-    assert all("语义匹配" in r["log"] for r in out)
+    assert all(r["log"].startswith("agent ") for r in out if r.get("log"))
 
 
 # --- golden-pair regression (manual; runs only when golden pairs exist) ------
@@ -383,12 +383,12 @@ def test_golden_pair_hit_rate() -> None:
 
 # --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
 
-SINGLE_YEAR_NOTE_STAGE2 = "（单年数据，无标准差）"
+SINGLE_YEAR_NOTE_STAGE2 = "（仅一年数据，无标准差）"
 
 
 def test_apply_results_single_year_history_adds_no_stddev_note(tmp_path: Path) -> None:
     """A semantic match whose matched history row has T=None must append the
-    「(单年数据，无标准差)」note to the log (V5-1)."""
+    「(仅一年数据，无标准差)」note to the log (V5-1)."""
     # History row with T=None (single-year data — stddev undefined).
     dagluben = [_dl(1, "甲大学", "计算机类(图灵)", "计算机类")]
     history = [

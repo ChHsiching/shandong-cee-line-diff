@@ -119,12 +119,12 @@ def test_match_strict_uses_history_dagluben_cat_mapping():
 
 # --- V5-1: single-year history T=None annotation (Slice A Task A2) ----------
 
-SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+SINGLE_YEAR_NOTE = "（仅一年数据，无标准差）"
 
 
 def test_match_strict_single_year_history_adds_no_stddev_note():
     """A strict match whose history row has T=None must append the
-    「(单年数据，无标准差)」note to the log (V5-1)."""
+    「(仅一年数据，无标准差)」note to the log (V5-1)."""
     history = [
         _hist(school="S大学", school_cat="", stripped="数学", J=55.0, T=None),
     ]

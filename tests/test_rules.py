@@ -3,7 +3,7 @@
 Slice 3 Task 3.2 — three rule fixtures:
   1. 专科排除: 小标题含「专科」的 181 行全部排除; 常规批两侧 0 专科残留.
   2. 选科非差异化: 跨年政策漂移 (物理 vs 物理和化学) 不阻断匹配; 命中后当选科
-     不一致时日志附加「选科政策漂移，已忽略」. 选科不进任何匹配键.
+     不一致时日志附加「选科要求跨年不同，不影响匹配」. 选科不进任何匹配键.
   3. 招生类别差异化: 普通 vs 中外合作 (同核心名) -> 不匹配 (不同轨道).
 
 The 专科 and 招生类别 rules are already implemented in Slice 1/2 builders; this
@@ -152,7 +152,7 @@ def test_stage1_strict_ignores_subject_in_key():
 
 def test_stage1_5_logs_subject_drift_when_subjects_differ():
     """Spec §9 / §5.4: when a coarse match pairs rows whose 选科 differ, the
-    log must append「选科政策漂移，已忽略」so a human reviewer can see it."""
+    log must append「选科要求跨年不同，不影响匹配」so a human reviewer can see it."""
     core_idx = stage1_5_coarse.build_core_idx(
         [_hist(school="D大学", school_cat="", core="数学", subject="物理", J=60.0)]
     )
@@ -162,7 +162,7 @@ def test_stage1_5_logs_subject_drift_when_subjects_differ():
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
-    assert "选科政策漂移，已忽略" in accepted[0]["log"]
+    assert "选科要求跨年不同，不影响匹配" in accepted[0]["log"]
 
 
 def test_stage1_5_multi_value_subject_drift_also_logged():
@@ -178,7 +178,7 @@ def test_stage1_5_multi_value_subject_drift_also_logged():
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
-    assert "选科政策漂移，已忽略" in accepted[0]["log"]
+    assert "选科要求跨年不同，不影响匹配" in accepted[0]["log"]
 
 
 # === Rule 3: 招生类别 differentiation (RED — different tracks never match) ====

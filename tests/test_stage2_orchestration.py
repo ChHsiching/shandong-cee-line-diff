@@ -238,7 +238,7 @@ def test_apply_results_backfills_matched_and_null(tmp_path: Path) -> None:
     assert matched["matched"] is True
     assert matched["J"] == 80.0
     assert matched["T"] == 1.0
-    assert "语义匹配" in matched["log"]
+    assert "agent 语义匹配" in matched["log"]
     assert "核心名同、方向括号对齐" in matched["log"]
 
     null_r = next(r for r in results if r["src_row_idx"] == 2)

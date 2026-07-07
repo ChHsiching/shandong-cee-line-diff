@@ -227,7 +227,7 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
 
     Both outputs are written from the same MatchResult list, so every (school,
     major) pair that appears in both must carry an identical row-end 7-tuple
-    (J, T, 匹配阶段, 单年数据, 选科漂移, 复核结果, 原因备注). We key by
+    (J, T, 匹配方式, 仅一年数据, 选科要求跨年变化, 二次复核, 原因说明). We key by
     (school, major) rather than row position because the flat output omits
     non-major rows and so its row positions do not align with the
     hierarchical output's.
@@ -501,7 +501,7 @@ def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_pa
     for r in rename_rows_in_main:
         assert r.get("J") is None
         assert r.get("T") is None
-        assert "疑似改名校" in r.get("log", "")
+        assert "可能改了名字" in r.get("log", "")
 
 
 # ---------------------------------------------------------------------------
@@ -532,7 +532,7 @@ _OUTPUT_HEADER_T = "近三年线差标准差"
 # columns. We read all 5 by header name so a column re-order cannot silently
 # break the hierarchical-vs-flat consistency check.
 _OUTPUT_STRUCTURED_HEADERS = (
-    "匹配阶段", "单年数据", "选科漂移", "复核结果", "原因备注",
+    "匹配方式", "仅一年数据", "选科要求跨年变化", "二次复核", "原因说明",
 )
 
 

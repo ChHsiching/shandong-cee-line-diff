@@ -4,7 +4,7 @@ Per Plan v2 binding: when ``verify_*_result.jsonl`` exist, run_pipeline filters
 存疑 verdicts out of coarse/semantic results and out of ``classified_idx``
 BEFORE ``_build_main_results`` so they fall naturally into
 ``remaining_unmatched → flight_and_special``. Each demoted row's special-table
-log must read「复核存疑：<原因>」(bypassing the LOG_SPECIAL_UNMATCHED fallback).
+log must read「二次复核认为可能有误：<原因>」(bypassing the LOG_SPECIAL_UNMATCHED fallback).
 
 These tests exercise the demote layer in isolation (pure functions + the
 ``flight_and_special`` ``demoted_map`` parameter) so the agent dispatch need
@@ -43,8 +43,8 @@ def test_filter_demoted_removes_uncertain_from_coarse_and_classified() -> None:
     """Given a 存疑 verdict, filter_demoted drops that idx from coarse_results
     AND from classified_idx (so it falls through to special)."""
     coarse = [
-        _match(1, "甲大学", "投资学(量化投资)", "粗筛匹配：核心名唯一"),
-        _match(2, "甲大学", "会计学", "粗筛匹配：核心名唯一"),
+        _match(1, "甲大学", "投资学(量化投资)", "核心名匹配：核心专业名相同"),
+        _match(2, "甲大学", "会计学", "核心名匹配：核心专业名相同"),
     ]
     classified = {1, 2, 5}
     verdict_by_idx = {1: "存疑", 2: "确定"}
@@ -59,7 +59,7 @@ def test_filter_demoted_removes_uncertain_from_coarse_and_classified() -> None:
 
 
 def test_filter_demoted_no_verdicts_returns_unchanged() -> None:
-    coarse = [_match(1, "甲", "a", "粗筛匹配：核心名唯一")]
+    coarse = [_match(1, "甲", "a", "核心名匹配：核心专业名相同")]
     out_coarse, out_classified, demoted_map = filter_demoted(
         coarse, {1}, {}, reasons_by_idx={},
     )
@@ -71,7 +71,7 @@ def test_filter_demoted_no_verdicts_returns_unchanged() -> None:
 def test_filter_demoted_passes_semantic_too() -> None:
     """filter_demoted works on any MatchResult list (coarse or semantic)."""
     semantic = [
-        _match(10, "乙", "量子", "语义匹配：方向对齐", j=50.0),
+        _match(10, "乙", "量子", "agent 语义匹配：方向对齐", j=50.0),
     ]
     out_sem, out_classified, demoted_map = filter_demoted(
         semantic, {10}, {10: "存疑"}, reasons_by_idx={10: "理由"},
@@ -87,7 +87,7 @@ def test_filter_demoted_passes_semantic_too() -> None:
 
 
 def test_flight_and_special_demoted_log_overrides_fallback() -> None:
-    """A demoted row routed to special gets「复核存疑：<原因>」, NOT the generic
+    """A demoted row routed to special gets「二次复核认为可能有误：<原因>」, NOT the generic
     LOG_SPECIAL_UNMATCHED fallback (v2阻断2 关键)."""
     d = _dl(1, "甲大学", "投资学(量化投资)")
     edges = flight_and_special([], [d], demoted_map={1: "方向不同：量化投资≠投资学"})
@@ -102,7 +102,7 @@ def test_flight_and_special_no_demoted_map_uses_fallback() -> None:
     """Without demoted_map, normal unmatched rows get the generic log."""
     d = _dl(1, "甲大学", "未知专业")
     edges = flight_and_special([], [d])
-    assert LOG_SPECIAL_UNMATCHED in edges[0]["log"] or "无法匹配" in edges[0]["log"]
+    assert "未能匹配" in edges[0]["log"] or "没找到" in edges[0]["log"]
 
 
 def test_flight_and_special_demoted_for_flight_row() -> None:
@@ -123,8 +123,8 @@ def test_build_main_results_excludes_demoted_row(tmp_path) -> None:
     bucket, NOT the matched bucket."""
     dagluben = [_dl(1, "甲大学", "投资学(量化投资)"), _dl(2, "甲大学", "会计学")]
     coarse = [
-        _match(1, "甲大学", "投资学(量化投资)", "粗筛匹配：核心名唯一"),
-        _match(2, "甲大学", "会计学", "粗筛匹配：核心名唯一"),
+        _match(1, "甲大学", "投资学(量化投资)", "核心名匹配：核心专业名相同"),
+        _match(2, "甲大学", "会计学", "核心名匹配：核心专业名相同"),
     ]
     classified = {1, 2}
 
@@ -150,8 +150,8 @@ def test_build_main_results_accepts_classified_idx_override() -> None:
     so the demote step can shrink the classified set before main-table build."""
     dagluben = [_dl(1, "甲", "a"), _dl(2, "甲", "b")]
     coarse = [
-        _match(1, "甲", "a", "粗筛匹配：核心名唯一"),
-        _match(2, "甲", "b", "粗筛匹配：核心名唯一"),
+        _match(1, "甲", "a", "核心名匹配：核心专业名相同"),
+        _match(2, "甲", "b", "核心名匹配：核心专业名相同"),
     ]
     # If we pass classified_idx missing idx 1, idx 1 should fall to special.
     main = _build_main_results(

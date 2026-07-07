@@ -3,8 +3,8 @@
 Two products (spec §7):
     - Hierarchical (大绿本_附线差_分层版.xlsx): a full copy of the大绿本
       workbook with seven columns appended at the row end
-      (近三年统计线差 / 近三年线差标准差 / 匹配阶段 / 单年数据 / 选科漂移 /
-      复核结果 / 原因备注). Every original row is preserved verbatim; non-major
+      (近三年统计线差 / 近三年线差标准差 / 匹配方式 / 仅一年数据 / 选科要求跨年变化 /
+      二次复核 / 原因说明). Every original row is preserved verbatim; non-major
       rows leave the seven new cells blank. Original columns are never
       overwritten.
     - Flat (大绿本_附线差_扁平版.xlsx): only专业行, each with all original
@@ -48,16 +48,16 @@ __all__ = [
     "HEADER_NOTE",
 ]
 
-# Append-position header labels (Plan v2 修订 binding: 7 named constants,
-# fixed order). Row-end layout = [J, T, 匹配阶段, 单年数据, 选科漂移,
-# 复核结果, 原因备注].
+# Append-position header labels — plain language, no jargon.
+# Row-end layout = [J, T, 匹配方式, 仅一年数据, 选科要求跨年变化,
+# 二次复核, 原因说明].
 HEADER_J = "近三年统计线差"
 HEADER_T = "近三年线差标准差"
-HEADER_STAGE = "匹配阶段"
-HEADER_SINGLE_YEAR = "单年数据"
-HEADER_DRIFT = "选科漂移"
-HEADER_VERIFIED = "复核结果"
-HEADER_NOTE = "原因备注"
+HEADER_STAGE = "匹配方式"
+HEADER_SINGLE_YEAR = "仅一年数据"
+HEADER_DRIFT = "选科要求跨年变化"
+HEADER_VERIFIED = "二次复核"
+HEADER_NOTE = "原因说明"
 
 # 1-based column indices for the appended seven, given the大绿本 has 12 cols.
 COL_J = 13
@@ -99,17 +99,17 @@ def _open_template(path: str | Path) -> openpyxl.Workbook:
 def _write_row_end(ws, row_idx: int, res: MatchResult) -> None:
     """Write the 7 row-end cells for a MatchResult.
 
-    Layout: [J, T, 匹配阶段, 单年数据, 选科漂移, 复核结果, 原因备注]
+    Layout: [J, T, 匹配方式, 仅一年数据, 选科要求跨年变化, 二次复核, 原因说明]
     where the last 5 = ``list(split_log(res.log).values())``.
     """
     structured = split_log(res.get("log") or "")
     ws.cell(row=row_idx, column=COL_J, value=res.get("J"))
     ws.cell(row=row_idx, column=COL_T, value=res.get("T"))
-    ws.cell(row=row_idx, column=COL_STAGE, value=structured["匹配阶段"])
-    ws.cell(row=row_idx, column=COL_SINGLE_YEAR, value=structured["单年数据"])
-    ws.cell(row=row_idx, column=COL_DRIFT, value=structured["选科漂移"])
-    ws.cell(row=row_idx, column=COL_VERIFIED, value=structured["复核结果"])
-    ws.cell(row=row_idx, column=COL_NOTE, value=structured["原因备注"])
+    ws.cell(row=row_idx, column=COL_STAGE, value=structured["匹配方式"])
+    ws.cell(row=row_idx, column=COL_SINGLE_YEAR, value=structured["仅一年数据"])
+    ws.cell(row=row_idx, column=COL_DRIFT, value=structured["选科要求跨年变化"])
+    ws.cell(row=row_idx, column=COL_VERIFIED, value=structured["二次复核"])
+    ws.cell(row=row_idx, column=COL_NOTE, value=structured["原因说明"])
 
 
 def _write_header_row_end(ws, row_idx: int) -> None:
@@ -136,7 +136,7 @@ def write_hierarchical(
     - The seven new columns (13-19) are added; only专业行 that have a
       :class:`MatchResult` carry values, all others stay blank. 专科 专业行
       without a result are annotated with LOG_ZHUANKE_OUT_OF_SCOPE so
-      ``匹配阶段`` becomes ``专科（超范围）`` (spec §3).
+      ``匹配方式`` becomes ``专科（超范围）`` (spec §3).
     """
     wb = _open_template(src_path)
     try:
@@ -157,11 +157,11 @@ def write_hierarchical(
             res = results_by_idx.get(row_idx)
             if res is None:
                 # 专业行 无结果 = 专科（本科行经 Fix B 均有 MatchResult）。
-                # 标注超范围 → split_log turns it into 匹配阶段=专科（超范围）.
+                # 标注超范围 → split_log turns it into 匹配方式=专科（超范围）.
                 if "专科" in str(subtitle or ""):
                     structured = split_log(LOG_ZHUANKE_OUT_OF_SCOPE)
                     ws.cell(row=row_idx, column=COL_STAGE,
-                            value=structured["匹配阶段"])
+                            value=structured["匹配方式"])
                     # J/T + other structured cells stay blank (专科 excluded).
                 continue
             _write_row_end(ws, row_idx, res)
@@ -181,7 +181,7 @@ def write_flat(
     """Write a flat table containing only专业行 + the seven appended columns.
 
     Columns 1-12 carry the original大绿本 fields; 13-19 carry
-    ``[J, T, 匹配阶段, 单年数据, 选科漂移, 复核结果, 原因备注]``. Non-major rows
+    ``[J, T, 匹配方式, 仅一年数据, 选科要求跨年变化, 二次复核, 原因说明]``. Non-major rows
     (批次头/小标题/学校行) are omitted entirely. 专科 专业行 are still excluded
     (spec §3, unchanged).
     """

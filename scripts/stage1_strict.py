@@ -28,7 +28,7 @@ DEFAULT_CAT_DAGLUBEN = "普通计划"
 # deviation (T). Such matched rows leave T=None and the match log appends this
 # note so a reviewer sees why T is blank. Shared by stage1_strict /
 # stage1_5_coarse / stage2_apply (Plan v2 binding — three anchors, one helper).
-LOG_SINGLE_YEAR_NOTE = "（单年数据，无标准差）"
+LOG_SINGLE_YEAR_NOTE = "（仅一年数据，无标准差）"
 
 
 def single_year_note(hist: HistoryRow) -> str:

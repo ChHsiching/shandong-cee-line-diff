@@ -1,8 +1,8 @@
 """Tests for scripts.write_outputs — hierarchical + flat output writers.
 
 iteration-3 (structured-columns): the main table now ends each row with **7
-columns** instead of 3 — ``[近三年统计线差, 近三年线差标准差, 匹配阶段, 单年数据,
-选科漂移, 复核结果, 原因备注]``. The single legacy「匹配日志」column is gone.
+columns** instead of 3 — ``[近三年统计线差, 近三年线差标准差, 匹配方式, 仅一年数据,
+选科要求跨年变化, 二次复核, 原因说明]``. The single legacy「匹配日志」column is gone.
 Original 12 columns + 7 row-end = 19 total. The 5 structured columns are
 populated via :func:`scripts.structured_log.split_log` over the legacy log
 string carried by each :class:`MatchResult`.
@@ -31,9 +31,9 @@ def _read_sheet(path: Path):
 
 
 # Row-end column layout (1-based within an output row):
-#   13 近三年统计线差  14 近三年线差标准差  15 匹配阶段
-#   16 单年数据        17 选科漂移          18 复核结果
-#   19 原因备注
+#   13 近三年统计线差  14 近三年线差标准差  15 匹配方式
+#   16 仅一年数据        17 选科要求跨年变化          18 二次复核
+#   19 原因说明
 EXPECTED_HEADER_TAIL = [
     write_outputs.HEADER_J,
     write_outputs.HEADER_T,
@@ -154,11 +154,11 @@ def test_hierarchical_missing_result_leaves_major_row_blank(
 def test_hierarchical_zhuanke_row_carries_专科_stage(
     minimal_hierarchical_dagluben_with_zhuanke, tmp_path
 ):
-    """分层版 专科 专业行: 匹配阶段=专科（超范围）, 备注 empty (spec §3)."""
+    """分层版 专科 专业行: 匹配方式=专科（超范围）, 备注 empty (spec §3)."""
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=LOG_STRICT),
         MatchResult(src_row_idx=6, matched=True, J=10.0, T=1.0,
-                    log="粗筛匹配：核心名唯一"),
+                    log="核心名匹配：核心专业名相同"),
     ]
     out = tmp_path / "hier.xlsx"
     write_outputs.write_hierarchical(
@@ -168,7 +168,7 @@ def test_hierarchical_zhuanke_row_carries_专科_stage(
     # The 专科 row (last in this fixture) has no MatchResult → writer annotates
     # it with LOG_ZHUANKE_OUT_OF_SCOPE. split_log turns that into the 5 cols.
     zhuanke_row = rows[-1]
-    # 专科（超范围） in 匹配阶段; 备注 empty; J/T blank (专科 excluded from matching).
+    # 专科（超范围） in 匹配方式; 备注 empty; J/T blank (专科 excluded from matching).
     assert zhuanke_row[write_outputs.COL_STAGE - 1] == "专科（超范围）"
     assert _norm(zhuanke_row[write_outputs.COL_NOTE - 1]) == ""
     assert zhuanke_row[write_outputs.COL_J - 1] is None
@@ -182,8 +182,8 @@ def test_hierarchical_structured_5_columns_match_split_log(
 ):
     """For every major row with a MatchResult, columns 15-19 equal
     ``list(split_log(log).values())``."""
-    log_strict_sy = f"{LOG_STRICT}；（单年数据，无标准差）"
-    log_coarse = "粗筛匹配：括号子集消歧（理工类）；选科政策漂移，已忽略"
+    log_strict_sy = f"{LOG_STRICT}；（仅一年数据，无标准差）"
+    log_coarse = "核心名匹配：核心专业名相同（理工类）；选科要求跨年不同，已忽略"
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=log_strict_sy),
         MatchResult(src_row_idx=6, matched=False, J=None, T=None, log=log_coarse),
@@ -250,8 +250,8 @@ def test_flat_structured_5_columns_match_split_log(
 ):
     """Flat version: columns 15-19 == list(split_log(log).values()) for every
     major row with a result."""
-    log_strict_sy = f"{LOG_STRICT}；（单年数据，无标准差）"
-    log_coarse = "粗筛匹配：括号子集消歧（理工类）；选科政策漂移，已忽略"
+    log_strict_sy = f"{LOG_STRICT}；（仅一年数据，无标准差）"
+    log_coarse = "核心名匹配：核心专业名相同（理工类）；选科要求跨年不同，已忽略"
     log_new = "新增专业：估算=同校同选科(19)均值=225.25"
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=log_strict_sy),
@@ -277,7 +277,7 @@ def test_flat_still_excludes_zhuanke_rows(
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=LOG_STRICT),
         MatchResult(src_row_idx=6, matched=True, J=70.0, T=2.0,
-                    log="粗筛匹配：核心名唯一"),
+                    log="核心名匹配：核心专业名相同"),
     ]
     out = tmp_path / "flat.xlsx"
     write_outputs.write_flat(

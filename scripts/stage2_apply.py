@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from scripts.constants import LOG_SEMANTIC_NULL_PREFIX, LOG_SEMANTIC_PREFIX, LOG_SUBJECT_DRIFT
+from scripts.constants import LOG_SEMANTIC_NULL_PREFIX, LOG_SEMANTIC_PREFIX, LOG_SUBJECT_NOTE
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 from scripts.stage1_strict import normalise_cat, single_year_note
 from scripts.stage2_agent import _core_compatible  # reuse the pre-filter
@@ -79,7 +79,7 @@ def _subject_drift_note(dagluben: DaglubenRow, matched: HistoryRow | None) -> st
     b = (matched.get("subject", "") or "").strip()
     if not a or not b or a == b:
         return ""
-    return f"；{LOG_SUBJECT_DRIFT}"
+    return f"；{LOG_SUBJECT_NOTE}"
 
 
 def _find_matched(

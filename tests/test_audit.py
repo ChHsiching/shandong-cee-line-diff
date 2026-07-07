@@ -1,19 +1,19 @@
 """Slice C — data-quality audit hard gate (spec V5-3, Plan v2 Slice C 修订).
 
 iteration-3 (structured-columns, Plan v2 CRITICAL扩范围): the audit now keys
-every log-dependent check off the structured「匹配阶段」column **by name**
+every log-dependent check off the structured「匹配方式」column **by name**
 (not the legacy log string, not a column index). This makes the gate robust
 to column re-ordering and removes the duplicated JUDGMENTAL_LOG_PREFIXES.
 
 Check mapping (iteration-3):
-  0  复核覆盖完备性 (judgmental coverage): every row whose 匹配阶段 ∈
-     {粗筛匹配, 语义匹配} in the hierarchical output must appear in
+  0  复核覆盖完备性 (judgmental coverage): every row whose 匹配方式 ∈
+     {核心名匹配, agent 语义匹配} in the hierarchical output must appear in
      ``verify_*_result.jsonl`` with verdict=确定.
-  1  每本科专业行「匹配阶段」非空 (0 缺失).
+  1  每本科专业行「匹配方式」非空 (0 缺失).
   2  每张产出表 0 个全空数据行.
   3  字段映射回归: each produced table non-empty.
-  4  随机 ≥30 匹配行 J/T 与近三年原值逐行比对 (精度区分): rows with 匹配阶段 ∈
-     {严格匹配, 粗筛匹配, 语义匹配} compared to source history; 匹配阶段 ==
+  4  随机 ≥30 匹配行 J/T 与近三年原值逐行比对 (精度区分): rows with 匹配方式 ∈
+     {严格匹配, 核心名匹配, agent 语义匹配} compared to source history; 匹配方式 ==
      新增专业 compared to the estimate table.
 """
 
@@ -32,13 +32,13 @@ from scripts.audit_output import AuditReport, audit, main
 # --- fixtures ---------------------------------------------------------------
 
 # iteration-3: row-end = 7 cols (J/T + 5 structured). The audit reads
-# 匹配阶段 by name (not index), so we keep the column order aligned with
+# 匹配方式 by name (not index), so we keep the column order aligned with
 # write_outputs for readability.
 HEADER = [
     "批次", "小标题", "学校代码", "学校名", "代号", "名称",
     "选考科目要求", "学制", "计划数", "学校备注", "年收费", "整行校准",
     "近三年统计线差", "近三年线差标准差",
-    "匹配阶段", "单年数据", "选科漂移", "复核结果", "原因备注",
+    "匹配方式", "仅一年数据", "选科要求跨年变化", "二次复核", "原因说明",
 ]
 
 
@@ -68,7 +68,7 @@ def _good_output_dir(tmp_path: Path) -> Path:
 
     Hierarchical / flat carry three 本科 major rows:
       - 严格匹配 (src_row_idx=2)
-      - 粗筛匹配 (src_row_idx=3) — judgmental, confirmed in the verify jsonl
+      - 核心名匹配 (src_row_idx=3) — judgmental, confirmed in the verify jsonl
       - 新增专业 (src_row_idx=4) — estimate row; J/T from 新增专业.xlsx
     Each row carries the 5 structured columns directly (no legacy log cell).
     """
@@ -82,7 +82,7 @@ def _good_output_dir(tmp_path: Path) -> Path:
         # coarse judgmental matched (src_row_idx=3) — confirmed
         ["4.常规批", "普通计划", "A01", "示例大学", "02", "数学",
          "物理", "4", "1", "", "", "02数学", 70.0, None,
-         "粗筛匹配", "", "", "确定", "核心名唯一"],
+         "核心名匹配", "", "", "确定", "核心名唯一"],
         # new major estimate (src_row_idx=4) — J/T from estimate, rounded
         ["4.常规批", "普通计划", "A01", "示例大学", "03", "新专业",
          "物理", "4", "1", "", "", "03新专业", 80.0, 4.0,
@@ -164,7 +164,7 @@ def _good_data_dir(tmp_path: Path) -> Path:
     return data
 
 
-# --- check 0: judgmental coverage (keys off 匹配阶段) ----------------------
+# --- check 0: judgmental coverage (keys off 匹配方式) ----------------------
 
 
 def test_audit_passes_on_good_output(tmp_path: Path) -> None:
@@ -182,7 +182,7 @@ def test_audit_passes_on_good_output(tmp_path: Path) -> None:
 
 
 def test_check0_fails_when_judgmental_row_not_in_verify(tmp_path: Path) -> None:
-    """A row with 匹配阶段=粗筛匹配 whose src_row_idx is absent from
+    """A row with 匹配方式=核心名匹配 whose src_row_idx is absent from
     verify_*_result.jsonl → check 0 fails → ok=False."""
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[99])
@@ -218,8 +218,8 @@ def test_check0_fails_when_verify_jsonl_missing(tmp_path: Path) -> None:
 
 
 def test_check0_does_not_treat_semantic_null_as_judgmental(tmp_path: Path) -> None:
-    """A 语义匹配 row is judgmental; but a row with 匹配阶段 NOT in
-    {粗筛匹配, 语义匹配} (e.g. 严格匹配 / 新增专业) is NOT judgmental — even
+    """A agent 语义匹配 row is judgmental; but a row with 匹配方式 NOT in
+    {核心名匹配, agent 语义匹配} (e.g. 严格匹配 / 新增专业) is NOT judgmental — even
     if its note text happens to contain those keywords. Confirm the stage
     whitelist is the only discriminator."""
     out = _good_output_dir(tmp_path)
@@ -236,21 +236,21 @@ def test_check0_does_not_treat_semantic_null_as_judgmental(tmp_path: Path) -> No
     assert c0["passed"] is True, c0
 
 
-# --- check 1: every 本科 major row has non-empty 匹配阶段 ----------------
+# --- check 1: every 本科 major row has non-empty 匹配方式 ----------------
 
 
 def test_check1_fails_on_blank_stage(tmp_path: Path) -> None:
-    """A flat major row with 匹配阶段 blank → check 1 fails."""
+    """A flat major row with 匹配方式 blank → check 1 fails."""
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
-    # Corrupt the flat output: blank 匹配阶段 on the first major row.
+    # Corrupt the flat output: blank 匹配方式 on the first major row.
     wb = openpyxl.load_workbook(out / "大绿本_附线差_扁平版.xlsx")
     ws = wb.active
-    # Find the 匹配阶段 column by name (not index).
+    # Find the 匹配方式 column by name (not index).
     header = [c.value for c in ws[1]]
-    stage_col = header.index("匹配阶段") + 1
+    stage_col = header.index("匹配方式") + 1
     ws.cell(row=2, column=stage_col).value = None
     wb.save(out / "大绿本_附线差_扁平版.xlsx")
     wb.close()
@@ -311,7 +311,7 @@ def test_check3_fails_when_table_has_no_data_rows(tmp_path: Path) -> None:
     assert c3["passed"] is False
 
 
-# --- check 4: J/T consistency (keys off 匹配阶段 for matched/estimate) -----
+# --- check 4: J/T consistency (keys off 匹配方式 for matched/estimate) -----
 
 
 def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
@@ -323,7 +323,7 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
         {"school": "示例大学", "major": "计算机", "J": 60.0, "T": 5.0},
         {"school": "示例大学", "major": "数学", "J": 70.0, "T": None},
     ]
-    # Corrupt the strict row's J (匹配阶段=严格匹配 → matched).
+    # Corrupt the strict row's J (匹配方式=严格匹配 → matched).
     wb = openpyxl.load_workbook(out / "大绿本_附线差_分层版.xlsx")
     ws = wb.active
     ws.cell(row=2, column=13).value = 999.0
@@ -340,7 +340,7 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
 
 
 def test_check4_estimate_row_uses_round_tolerance(tmp_path: Path) -> None:
-    """新增专业 rows (匹配阶段=新增专业) compared against 新增专业.xlsx."""
+    """新增专业 rows (匹配方式=新增专业) compared against 新增专业.xlsx."""
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)

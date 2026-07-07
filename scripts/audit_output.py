@@ -11,7 +11,7 @@ previously inspected the legacy「匹配日志」cell now keys off the structure
 the duplicated JUDGMENTAL_LOG_PREFIXES copy and survives column re-ordering.
 
 Checks:
-  0  judgmental_coverage — every row whose 匹配阶段 ∈ {粗筛匹配, 语义匹配} in
+  0  judgmental_coverage — every row whose 匹配阶段 ∈ {核心名匹配, agent 语义匹配} in
      the hierarchical output must appear in ``verify_*_result.jsonl`` with
      verdict=确定. Missing jsonl entirely → fail with「复核未派发」.
   1  nonempty_stage — every 本科 major row in the flat output carries a
@@ -21,7 +21,7 @@ Checks:
      (field-mapping regression guard).
   4  jt_consistency — random ≥30 matched rows' J/T agree with the source
      近三年 values (matched rows) or with the estimate table (新增 rows).
-     Matched = 匹配阶段 ∈ {严格匹配, 粗筛匹配, 语义匹配}; estimate = 匹配阶段
+     Matched = 匹配阶段 ∈ {严格匹配, 核心名匹配, agent 语义匹配}; estimate = 匹配阶段
      == 新增专业.
 
 A side artefact ``audit_sample.xlsx`` is written for human semantic review; it
@@ -82,9 +82,9 @@ PRODUCED_TABLES: tuple[str, ...] = (
 # iteration-3: stage-based whitelists (replace the old JUDGMENTAL_LOG_PREFIXES
 # copy). The audit reads 匹配阶段 by column NAME, so a future wording tweak in
 # the log constants cannot silently drop a row from a check.
-STAGE_HEADER = "匹配阶段"
-JUDGMENTAL_STAGES: frozenset[str] = frozenset({"粗筛匹配", "语义匹配"})
-MATCHED_STAGES: frozenset[str] = frozenset({"严格匹配", "粗筛匹配", "语义匹配"})
+STAGE_HEADER = "匹配方式"
+JUDGMENTAL_STAGES: frozenset[str] = frozenset({"核心名匹配", "agent 语义匹配"})
+MATCHED_STAGES: frozenset[str] = frozenset({"严格匹配", "核心名匹配", "agent 语义匹配"})
 ESTIMATE_STAGE = "新增专业"
 
 # Column indices in the hierarchical / flat output (1-based) — used only for
@@ -205,7 +205,7 @@ def _row_fully_blank(row: tuple) -> bool:
 def _check0_judgmental_coverage(
     hier_rows: list[tuple], verdicts: dict[int, str] | None
 ) -> AuditCheck:
-    """Every row with 匹配阶段 ∈ {粗筛匹配, 语义匹配} must have verdict=确定
+    """Every row with 匹配阶段 ∈ {核心名匹配, agent 语义匹配} must have verdict=确定
     in verify_*_result.jsonl."""
     name = "judgmental_coverage"
     if verdicts is None:
@@ -324,7 +324,7 @@ def _check4_jt_consistency(
 ) -> AuditCheck:
     """Random ≥30 matched rows' J/T agree with source (precision-aware).
 
-    Matched rows (匹配阶段 ∈ {严格匹配, 粗筛匹配, 语义匹配}) are compared against
+    Matched rows (匹配阶段 ∈ {严格匹配, 核心名匹配, agent 语义匹配}) are compared against
     the source近三年 history value at (school, major) with a tight tolerance
     (handles float display drift; single-year T=None must match None).
 
