@@ -116,7 +116,7 @@ plugin 自带 SessionStart hook，**新开 session 自动建好 Python venv + op
 
 定位 plugin 根 $P（含 scripts/ + .venv）：
 ```bash
-P=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1))))
+P=$(dirname $(dirname $(dirname $(find ~/.claude/plugins ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1))))
 ```
 
 跑 pipeline（`PYTHONPATH=$P` 前缀 + plugin venv python）：
