@@ -26,7 +26,11 @@ import json
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from scripts.constants import LOG_SEMANTIC_NULL_PREFIX, LOG_SEMANTIC_PREFIX, LOG_SUBJECT_NOTE
+from scripts.constants import (
+    LOG_SEMANTIC_NULL_PREFIX,
+    LOG_SEMANTIC_PREFIX,
+    LOG_SUBJECT_NOTE,
+)
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 from scripts.stage1_strict import normalise_cat, single_year_note
 from scripts.stage2_agent import _core_compatible  # reuse the pre-filter
@@ -52,9 +56,7 @@ class Stage2ContractError(ValueError):
     """Raised when a result jsonl line violates the Stage 2 contract."""
 
 
-def _candidate_set(
-    dagluben: DaglubenRow, history: Sequence[HistoryRow]
-) -> set[str]:
+def _candidate_set(dagluben: DaglubenRow, history: Sequence[HistoryRow]) -> set[str]:
     """The set of近三年 major strings the agent was allowed to pick from for
     this dagluben row. Mirrors :func:`scripts.stage2_agent._is_candidate` but
     returns the major names so we can membership-test the agent's answer."""
@@ -63,7 +65,7 @@ def _candidate_set(
     dl_core = dagluben.get("core", "")
     out: set[str] = set()
     for h in history:
-        if (h.get("school", "") != dl_school):
+        if h.get("school", "") != dl_school:
             continue
         if normalise_cat(h.get("school_cat", "")) != dl_cat:
             continue
@@ -97,7 +99,9 @@ def _find_matched(
             continue
         if normalise_cat(h.get("school_cat", "")) != dl_cat:
             continue
-        if h.get("major", "") == match_major and _core_compatible(dl_core, h.get("core", "")):
+        if h.get("major", "") == match_major and _core_compatible(
+            dl_core, h.get("core", "")
+        ):
             return h
     return None
 
@@ -113,14 +117,10 @@ def _parse_line(raw: str, path: Path, lineno: int) -> dict[str, object]:
             f"{path.name}:{lineno}: JSON 解析失败 — {exc.msg}"
         ) from exc
     if not isinstance(obj, dict):
-        raise Stage2ContractError(
-            f"{path.name}:{lineno}: 顶层不是 JSON 对象"
-        )
+        raise Stage2ContractError(f"{path.name}:{lineno}: 顶层不是 JSON 对象")
     missing = [k for k in REQUIRED_KEYS if k not in obj]
     if missing:
-        raise Stage2ContractError(
-            f"{path.name}:{lineno}: 缺少必需字段 {missing}"
-        )
+        raise Stage2ContractError(f"{path.name}:{lineno}: 缺少必需字段 {missing}")
     return obj
 
 
@@ -217,7 +217,9 @@ def _validate_and_build(
             f"{match_major!r} 的 T={expected_t!r} 不一致"
         )
 
-    log = f"{LOG_SEMANTIC_PREFIX}：{reason}{_subject_drift_note(dagluben, matched_hist)}"
+    log = (
+        f"{LOG_SEMANTIC_PREFIX}：{reason}{_subject_drift_note(dagluben, matched_hist)}"
+    )
     note = single_year_note(matched_hist)
     if note:
         log = f"{log}；{note}"
@@ -227,6 +229,7 @@ def _validate_and_build(
         school_cat=dagluben.get("school_cat", ""),
         major=dagluben.get("major", ""),
         matched=True,
+        matched_major=match_major,
         J=expected_j,
         T=expected_t,
         log=log,

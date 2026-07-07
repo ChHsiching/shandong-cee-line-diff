@@ -17,27 +17,27 @@ class HistoryRow(TypedDict, total=False):
     """A row in the unified近三年 history table (Stage 0 output, regular
     batch in Slice 1; early batch merged in Slice 2)."""
 
-    school: str            # 基础校名 (类别已剥离)
-    school_cat: str        # 招生类别 (从校名/小标题剥离；普通为 "")
-    major: str             # 归一化后专业全名
-    stripped: str          # 剥忽略类括号后的归一化全名 (严格匹配键之一)
-    core: str              # 核心名 (去全部括号)
-    subject: str           # 选考科目要求 (非差异化)
-    J: float | None        # 统计线差
-    T: float | None        # 线差标准差
-    source_table: str      # 来源表 (常规批一段线 / 提前批)
+    school: str  # 基础校名 (类别已剥离)
+    school_cat: str  # 招生类别 (从校名/小标题剥离；普通为 "")
+    major: str  # 归一化后专业全名
+    stripped: str  # 剥忽略类括号后的归一化全名 (严格匹配键之一)
+    core: str  # 核心名 (去全部括号)
+    subject: str  # 选考科目要求 (非差异化)
+    J: float | None  # 统计线差
+    T: float | None  # 线差标准差
+    source_table: str  # 来源表 (常规批一段线 / 提前批)
 
 
 class DaglubenRow(TypedDict, total=False):
     """A专业行 from the大绿本本科专业表 (Stage 0 output, the match left side)."""
 
-    school: str            # 学校名 (大绿本已无类别后缀)
-    school_cat: str        # 招生类别 (来自小标题 B 列；普通计划为 "")
-    major: str             # 归一化后专业全名 (F 列)
-    stripped: str          # 剥忽略类括号后
-    core: str              # 核心名
-    subject: str           # 选考科目要求 (G 列)
-    batch: str             # 原始批次字符串
+    school: str  # 学校名 (大绿本已无类别后缀)
+    school_cat: str  # 招生类别 (来自小标题 B 列；普通计划为 "")
+    major: str  # 归一化后专业全名 (F 列)
+    stripped: str  # 剥忽略类括号后
+    core: str  # 核心名
+    subject: str  # 选考科目要求 (G 列)
+    batch: str  # 原始批次字符串
     # Original 大绿本 row index (1-based, into the source workbook) so the
     # hierarchical output can find and extend the right row.
     src_row_idx: int
@@ -46,14 +46,16 @@ class DaglubenRow(TypedDict, total=False):
 class MatchResult(TypedDict, total=False):
     """One 大绿本专业 row paired with a history J/T (or marked unmatched)."""
 
-    src_row_idx: int        # -> DaglubenRow.src_row_idx
+    src_row_idx: int  # -> DaglubenRow.src_row_idx
     school: str
     school_cat: str
     major: str
     matched: bool
-    J: float | None         # 统计线差 (matched) or estimate (新增) or None
-    T: float | None         # 线差标准差
-    log: str                # 匹配日志 (spec §9)
+    matched_major: str  # 匹配到的往年候选 major 原文（agent 语义匹配填；
+    # verify 据此在同校精确锁定候选，避开 J/T 巧合错配）
+    J: float | None  # 统计线差 (matched) or estimate (新增) or None
+    T: float | None  # 线差标准差
+    log: str  # 匹配日志 (spec §9)
 
 
 class EstimateResult(TypedDict, total=False):
@@ -65,11 +67,11 @@ class EstimateResult(TypedDict, total=False):
     None are excluded; if no compatible row has a T, T is None).
     """
 
-    value: float | None     # 统计线差估算 (J)
-    T: float | None         # 线差标准差估算 (V5-1)
-    level: int              # 0 同校同选科 / 1 同校全专业 / 2 整校无历史
+    value: float | None  # 统计线差估算 (J)
+    T: float | None  # 线差标准差估算 (V5-1)
+    level: int  # 0 同校同选科 / 1 同校全专业 / 2 整校无历史
     log: str
-    n: int                  # 样本量
+    n: int  # 样本量
 
 
 class VerifyResult(TypedDict, total=False):
@@ -80,9 +82,9 @@ class VerifyResult(TypedDict, total=False):
     demote to special table). It never alters J/T, only the row's fate.
     """
 
-    src_row_idx: int        # -> DaglubenRow.src_row_idx of the verified match
-    verdict: str            # "确定" | "存疑"
-    reason: str             # 非空 reason for the verdict
+    src_row_idx: int  # -> DaglubenRow.src_row_idx of the verified match
+    verdict: str  # "确定" | "存疑"
+    reason: str  # 非空 reason for the verdict
 
 
 class VerifyApplyResult(TypedDict, total=False):
@@ -94,9 +96,9 @@ class VerifyApplyResult(TypedDict, total=False):
     maps every seen src_row_idx to its verdict for downstream filtering.
     """
 
-    confirmed: list        # list[MatchResult] (verdict=确定)
-    demoted: list          # list[EdgeRow] (verdict=存疑)
-    verdict_by_idx: dict   # dict[int, str]
+    confirmed: list  # list[MatchResult] (verdict=确定)
+    demoted: list  # list[EdgeRow] (verdict=存疑)
+    verdict_by_idx: dict  # dict[int, str]
 
 
 class StructuredLog(TypedDict):
@@ -133,10 +135,10 @@ class RenameRow(TypedDict, total=False):
     rename web-search step (Plan v2 binding).
     """
 
-    new_school: str           # 2026 大绿本校名 (改名后)
-    old_school: str           # 候选旧校名 (改名前)
-    confidence: float         # agent 置信度 [0,1]
-    is_rename: bool           # agent 最终判定（False = 候选不构成改名）
-    major_count_2026: int     # 该校 2026 本科专业数（辅助人工核验）
-    remark: str               # 备注（最后一步网查写入；可被人工编辑）
-    manual_reviewed: bool     # 备注 是否已经人工编辑（True 则网查不覆盖）
+    new_school: str  # 2026 大绿本校名 (改名后)
+    old_school: str  # 候选旧校名 (改名前)
+    confidence: float  # agent 置信度 [0,1]
+    is_rename: bool  # agent 最终判定（False = 候选不构成改名）
+    major_count_2026: int  # 该校 2026 本科专业数（辅助人工核验）
+    remark: str  # 备注（最后一步网查写入；可被人工编辑）
+    manual_reviewed: bool  # 备注 是否已经人工编辑（True 则网查不覆盖）

@@ -43,7 +43,9 @@ from scripts.verify_judgment import (
 # ---------------------------------------------------------------------------
 
 
-def _dl(idx: int, school: str, major: str, core: str, batch: str = "4.常规批") -> DaglubenRow:
+def _dl(
+    idx: int, school: str, major: str, core: str, batch: str = "4.常规批"
+) -> DaglubenRow:
     return DaglubenRow(
         src_row_idx=idx,
         school=school,
@@ -56,7 +58,9 @@ def _dl(idx: int, school: str, major: str, core: str, batch: str = "4.常规批"
     )
 
 
-def _hist(school: str, major: str, core: str, j: float = 80.0, t: float | None = 1.0) -> HistoryRow:
+def _hist(
+    school: str, major: str, core: str, j: float = 80.0, t: float | None = 1.0
+) -> HistoryRow:
     return HistoryRow(
         school=school,
         school_cat="",
@@ -70,7 +74,9 @@ def _hist(school: str, major: str, core: str, j: float = 80.0, t: float | None =
     )
 
 
-def _match(idx: int, school: str, major: str, log: str = "核心名匹配：核心专业名相同") -> MatchResult:
+def _match(
+    idx: int, school: str, major: str, log: str = "核心名匹配：核心专业名相同"
+) -> MatchResult:
     return MatchResult(
         src_row_idx=idx,
         school=school,
@@ -131,7 +137,8 @@ def test_build_verify_batches_attaches_dagluben_candidate_and_requirement() -> N
 def test_build_verify_batches_splits_into_batches_of_2() -> None:
     """3 judgmental matches / batch_size=2 → 2 batches (2 + 1)."""
     judgment_matches = [
-        _match(i, "甲大学", f"专业{i}", log="核心名匹配：核心专业名相同") for i in (1, 2, 3)
+        _match(i, "甲大学", f"专业{i}", log="核心名匹配：核心专业名相同")
+        for i in (1, 2, 3)
     ]
     dagluben = [_dl(i, "甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
     history = [_hist("甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
@@ -155,7 +162,10 @@ def test_build_verify_batches_skips_non_judgmental_strict_matches() -> None:
         _match(1, "甲大学", "计算机", log="严格匹配：归一化专业名+招生类别一致"),
         _match(2, "甲大学", "投资学(量化投资)", log="核心名匹配：核心专业名相同"),
     ]
-    dagluben = [_dl(1, "甲大学", "计算机", "计算机"), _dl(2, "甲大学", "投资学(量化投资)", "投资学")]
+    dagluben = [
+        _dl(1, "甲大学", "计算机", "计算机"),
+        _dl(2, "甲大学", "投资学(量化投资)", "投资学"),
+    ]
     history = [_hist("甲大学", "计算机", "计算机"), _hist("甲大学", "投资学", "投资学")]
 
     batches = build_verify_batches(judgment_matches, dagluben, history, batch_size=20)
@@ -164,13 +174,43 @@ def test_build_verify_batches_skips_non_judgmental_strict_matches() -> None:
     assert idxs == [2]  # strict idx 1 excluded
 
 
+def test_build_verify_batches_matched_major_pins_candidate_when_jt_collide() -> None:
+    """#3: 两个同校同核心名候选 J/T 恰好相同时，MatchResult.matched_major 精确
+    锁定 agent 选中的那条，避开 J/T 巧合错定位（量子计划↔未来工程师项目制
+    bug 的根因）。matched_major 缺失时退化到旧 J/T 路径。"""
+    history = [
+        _hist("X大学", "数学(量子)", "数学", j=70.0, t=3.0),
+        _hist("X大学", "数学(未来工程师)", "数学", j=70.0, t=3.0),
+    ]
+    match = MatchResult(
+        src_row_idx=5,
+        school="X大学",
+        school_cat="",
+        major="数学(量子先锋)",
+        matched=True,
+        matched_major="数学(量子)",
+        J=70.0,
+        T=3.0,
+        log="agent 语义匹配：方向对齐",
+    )
+    dagluben = [_dl(5, "X大学", "数学(量子先锋)", "数学")]
+
+    batches = build_verify_batches([match], dagluben, history, batch_size=20)
+    assert len(batches) == 1
+    cand = batches[0].items[0].matched_candidate
+    # matched_major 锁定「数学(量子)」，而非 J/T 巧合命中的第一条。
+    assert cand["major"] == "数学(量子)"
+
+
 # ---------------------------------------------------------------------------
 # write_verify_prompts
 # ---------------------------------------------------------------------------
 
 
 def test_write_verify_prompts_writes_one_file_per_batch(tmp_path: Path) -> None:
-    judgment_matches = [_match(i, "甲大学", f"专业{i}", "核心名匹配：核心专业名相同") for i in (1, 2, 3)]
+    judgment_matches = [
+        _match(i, "甲大学", f"专业{i}", "核心名匹配：核心专业名相同") for i in (1, 2, 3)
+    ]
     dagluben = [_dl(i, "甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
     history = [_hist("甲大学", f"专业{i}", f"专业{i}") for i in (1, 2, 3)]
 
@@ -202,13 +242,22 @@ def _basic_setup() -> tuple[list[MatchResult], list[DaglubenRow]]:
     return matches, dagluben
 
 
-def test_apply_verify_routes_confirmed_to_confirmed_and_uncertain_to_demoted(tmp_path: Path) -> None:
+def test_apply_verify_routes_confirmed_to_confirmed_and_uncertain_to_demoted(
+    tmp_path: Path,
+) -> None:
     """CI contract: 确定 → confirmed (MatchResult), 存疑 → demoted (EdgeRow)."""
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "verify_batch_01_result.jsonl", [
-        {"src_row_idx": 1, "verdict": "存疑", "reason": "方向不同：量化投资≠投资学"},
-        {"src_row_idx": 2, "verdict": "确定", "reason": "同名同方向"},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "verify_batch_01_result.jsonl",
+        [
+            {
+                "src_row_idx": 1,
+                "verdict": "存疑",
+                "reason": "方向不同：量化投资≠投资学",
+            },
+            {"src_row_idx": 2, "verdict": "确定", "reason": "同名同方向"},
+        ],
+    )
     result = apply_verify([jsonl], dagluben, matches)
     confirmed_idxs = {r["src_row_idx"] for r in result["confirmed"]}
     demoted_idxs = {r["src_row_idx"] for r in result["demoted"]}
@@ -226,9 +275,12 @@ def test_apply_verify_routes_confirmed_to_confirmed_and_uncertain_to_demoted(tmp
 def test_apply_verify_confirmed_keeps_original_matchresult(tmp_path: Path) -> None:
     """确定 keeps the original MatchResult (J/T/log intact)."""
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 2, "verdict": "确定", "reason": "ok"},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 2, "verdict": "确定", "reason": "ok"},
+        ],
+    )
     result = apply_verify([jsonl], dagluben, matches)
     assert len(result["confirmed"]) == 1
     assert result["confirmed"][0]["J"] == 80.0
@@ -237,46 +289,63 @@ def test_apply_verify_confirmed_keeps_original_matchresult(tmp_path: Path) -> No
 
 def test_apply_verify_rejects_verdict_outside_allowed(tmp_path: Path) -> None:
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 1, "verdict": "可能", "reason": "x"},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 1, "verdict": "可能", "reason": "x"},
+        ],
+    )
     with pytest.raises(VerifyContractError):
         apply_verify([jsonl], dagluben, matches)
 
 
 def test_apply_verify_rejects_missing_required_key(tmp_path: Path) -> None:
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 1, "verdict": "确定"},  # missing reason
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 1, "verdict": "确定"},  # missing reason
+        ],
+    )
     with pytest.raises(VerifyContractError):
         apply_verify([jsonl], dagluben, matches)
 
 
 def test_apply_verify_rejects_empty_reason(tmp_path: Path) -> None:
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 1, "verdict": "存疑", "reason": "   "},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 1, "verdict": "存疑", "reason": "   "},
+        ],
+    )
     with pytest.raises(VerifyContractError):
         apply_verify([jsonl], dagluben, matches)
 
 
 def test_apply_verify_rejects_duplicate_src_row_idx(tmp_path: Path) -> None:
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 1, "verdict": "确定", "reason": "a"},
-        {"src_row_idx": 1, "verdict": "存疑", "reason": "b"},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 1, "verdict": "确定", "reason": "a"},
+            {"src_row_idx": 1, "verdict": "存疑", "reason": "b"},
+        ],
+    )
     with pytest.raises(VerifyContractError):
         apply_verify([jsonl], dagluben, matches)
 
 
-def test_apply_verify_rejects_src_row_idx_not_in_judgment_matches(tmp_path: Path) -> None:
+def test_apply_verify_rejects_src_row_idx_not_in_judgment_matches(
+    tmp_path: Path,
+) -> None:
     matches, dagluben = _basic_setup()
-    jsonl = _write_jsonl(tmp_path / "r.jsonl", [
-        {"src_row_idx": 999, "verdict": "确定", "reason": "x"},
-    ])
+    jsonl = _write_jsonl(
+        tmp_path / "r.jsonl",
+        [
+            {"src_row_idx": 999, "verdict": "确定", "reason": "x"},
+        ],
+    )
     with pytest.raises(VerifyContractError):
         apply_verify([jsonl], dagluben, matches)
 

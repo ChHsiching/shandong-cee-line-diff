@@ -52,9 +52,9 @@ __all__ = [
 # Logs marking a match as 判断型 (needs second-pass verification, V5-0).
 # Strict-exact (LOG_STRICT) is构造确定 and excluded.
 JUDGMENT_LOG_PREFIXES: tuple[str, ...] = (
-    LOG_COARSE_CANDIDATE,            # 粗筛匹配：核心名唯一
-    LOG_COARSE_CANDIDATE,   # 粗筛匹配：括号子集消歧
-    LOG_SEMANTIC_PREFIX,          # 语义匹配 (matched)
+    LOG_COARSE_CANDIDATE,  # 粗筛匹配：核心名唯一
+    LOG_COARSE_CANDIDATE,  # 粗筛匹配：括号子集消歧
+    LOG_SEMANTIC_PREFIX,  # 语义匹配 (matched)
 )
 
 # Demote log prefix injected into special-table EdgeRows for存疑 verdicts.
@@ -93,6 +93,7 @@ def filter_demoted(
         idx for idx in classified_idx if verdict_by_idx.get(idx) != "存疑"
     }
     return out_results, out_classified, demoted_map
+
 
 # Inline output contract shipped in every prompt file.
 OUTPUT_SCHEMA: dict[str, object] = {
@@ -184,9 +185,7 @@ def build_verify_batches(
     with whatever dagluben row carries its src_row_idx and an empty candidate,
     so verification proceeds and the agent can flag存疑.
     """
-    dgl_by_idx: dict[int, DaglubenRow] = {
-        d.get("src_row_idx", 0): d for d in dagluben
-    }
+    dgl_by_idx: dict[int, DaglubenRow] = {d.get("src_row_idx", 0): d for d in dagluben}
     hist_list = list(history)
 
     items: list[VerifyBatchItem] = []
@@ -226,16 +225,28 @@ def _locate_candidate(
 ) -> HistoryRow:
     """Find the近三年 row the prior stage matched this dagluben row to.
 
-    The MatchResult carries the echoed J/T; the candidate is the same-school
-    history row whose core matches and whose J/T equals the echoed values.
-    Returns an empty HistoryRow if none matches (agent will see empty + can
-    judge存疑).
+    优先用 ``MatchResult.matched_major``（agent 语义匹配记录的候选 major 原文）
+    在同校精确锁定——避开 J/T 舍入或巧合相同导致的定位错误（多个不同方向的
+    候选 J/T 恰好相同会让 J/T 匹配找错行，曾导致量子计划被错定位成未来工程师
+    项目制）。matched_major 是 agent 选中的候选字面值，同校内唯一。
+
+    matched_major 缺失（未经 Stage 2 的旧 MatchResult）才退化到 J/T echo +
+    同校同核心名 + closest-J 容差。Returns an empty HistoryRow if none matches
+    (agent will see empty + can judge存疑).
     """
     dl_school = dagluben.get("school", "")
+
+    # 优先：matched_major 精确匹配（#3 修复，避开 J/T 巧合错配）。
+    matched_major = match.get("matched_major", "")
+    if matched_major:
+        for h in history:
+            if h.get("school", "") == dl_school and h.get("major", "") == matched_major:
+                return h
+
+    # 退化 1：J/T echo + 同校同核心名（matched_major 缺失时的旧路径）。
     dl_core = dagluben.get("core", "")
     j = match.get("J")
     t = match.get("T")
-    # Prefer an exact J/T echo (the prior stage copied the candidate's values).
     for h in history:
         if h.get("school", "") != dl_school:
             continue
@@ -243,16 +254,15 @@ def _locate_candidate(
             continue
         if h.get("J") == j and h.get("T") == t:
             return h
-    # Fallback: a unique same-school + same-core candidate (data may carry
-    # J/T that drifted through rounding; the agent still sees the right row).
+    # 退化 2：唯一同校同核心名候选（J/T 可能因舍入漂移）。
     same_core = [
-        h for h in history
+        h
+        for h in history
         if h.get("school", "") == dl_school and h.get("core", "") == dl_core
     ]
     if len(same_core) == 1:
         return same_core[0]
-    # Fallback 2: 多个 same-core 候选时，按 J 最接近 echo 的(容差 0.5)——
-    # 粗筛/语义匹配携带的 J/T echo 可能因舍入/聚合漂移，取最接近的那行。
+    # 退化 3：多个 same-core 候选时，按 J 最接近 echo 的(容差 0.5)。
     if same_core and j is not None:
         closest = min(same_core, key=lambda h: abs((h.get("J") or 0) - (j or 0)))
         if abs((closest.get("J") or 0) - (j or 0)) <= 0.5:
@@ -282,9 +292,7 @@ def _item_payload(item: VerifyBatchItem) -> dict[str, object]:
     }
 
 
-def write_verify_prompts(
-    batches: Sequence[VerifyBatch], out_dir: Path
-) -> list[Path]:
+def write_verify_prompts(batches: Sequence[VerifyBatch], out_dir: Path) -> list[Path]:
     """Write one ``verify_batch_NN.json`` per batch into ``out_dir``.
 
     Each file is a dict with ``batch`` (1-based index), ``items`` (full
@@ -329,9 +337,7 @@ def _parse_line(raw: str, path: Path, lineno: int) -> dict[str, object]:
         raise VerifyContractError(f"{path.name}:{lineno}: 顶层不是 JSON 对象")
     missing = [k for k in REQUIRED_KEYS if k not in obj]
     if missing:
-        raise VerifyContractError(
-            f"{path.name}:{lineno}: 缺少必需字段 {missing}"
-        )
+        raise VerifyContractError(f"{path.name}:{lineno}: 缺少必需字段 {missing}")
     return obj
 
 
@@ -381,12 +387,8 @@ def apply_verify(
       - src_row_idx unique across all inputs
       - src_row_idx ∈ judgmental matches set
     """
-    dgl_by_idx: dict[int, DaglubenRow] = {
-        d.get("src_row_idx", 0): d for d in dagluben
-    }
-    match_by_idx: dict[int, MatchResult] = {
-        m.get("src_row_idx", 0): m for m in matches
-    }
+    dgl_by_idx: dict[int, DaglubenRow] = {d.get("src_row_idx", 0): d for d in dagluben}
+    match_by_idx: dict[int, MatchResult] = {m.get("src_row_idx", 0): m for m in matches}
 
     confirmed: list[MatchResult] = []
     demoted: list[EdgeRow] = []
