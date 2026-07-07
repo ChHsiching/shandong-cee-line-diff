@@ -116,7 +116,7 @@ pipeline 代码（`scripts/`）在 **plugin 根**（本 skill 目录的上两级
 
 ```bash
 # 在工作目录（数据 data/ 所在）：
-PLUGIN_ROOT=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | head -1))))
+PLUGIN_ROOT=$(dirname $(dirname $(dirname $(find ~/.claude/plugins/cache -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1))))
 python3 -m venv .venv && .venv/bin/pip install -q openpyxl   # 一次 setup
 ```
 
