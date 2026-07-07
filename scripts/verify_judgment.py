@@ -1,7 +1,7 @@
 """Slice B — judgmental-match second-pass verification (V5-0) — pure functions.
 
-Per spec V5-0 / Plan v2 binding (Slice B修订). Every judgmental match (coarse
-核心名唯一/消歧 + agent 语义 matched) must pass a **second agent review** that
+Per spec V5-0 / Plan v2 binding (Slice B修订). Every judgmental match
+(agent 语义 matched) must pass a **second agent review** that
 returns「确定」(confirmed — keep in main table) or「存疑」(uncertain — demote to
 special). The agent itself cannot be invoked from Python (Agent is a harness
 tool), so this module ships only the testable pure layer:
@@ -103,7 +103,9 @@ OUTPUT_SCHEMA: dict[str, object] = {
         " reason(非空, ≤30字, 说明判定依据)。每 src_row_idx 至多一行。"
         " 判定原则: 该配对是否确定正确? 六要素(核心名/性别/合作/校区/方向/"
         "招生类别)是否真对齐? 方向不同(如投资学(量化投资)≠投资学)→存疑。"
-        "不确定就判存疑, 宁可保守。"
+        "重要规则: 这所学校往年只有 1 个同核心专业名时, 今年的专业不管改方向/"
+        "改名/换措辞(标点/词序/加减括号内容)都是同一个专业, 判确定——只有往年"
+        "有多个同核心名时才需细比方向。不确定就判存疑, 宁可保守。"
     ),
     "required_keys": ["src_row_idx", "verdict", "reason"],
     "allowed_verdicts": ["确定", "存疑"],
@@ -161,7 +163,10 @@ def _requirement_text(dagluben: DaglubenRow, cand: HistoryRow) -> str:
     return (
         "判定该配对是否确定正确。六要素(核心名/性别/合作/校区/方向/招生类别)"
         "是否真对齐? 大绿本专业带方向括号时须与候选方向一致"
-        "(如投资学(量化投资)≠投资学)。不确定→存疑, 宁可保守。"
+        "(如投资学(量化投资)≠投资学)。重要规则: 这所学校往年只有 1 个同核心"
+        "专业名时, 今年的专业不管改方向/改名/换措辞(标点/词序/加减括号内容)都"
+        "是同一个专业, 判确定——只有往年有多个同核心名时才需细比方向。"
+        "不确定→存疑, 宁可保守。"
     )
 
 
