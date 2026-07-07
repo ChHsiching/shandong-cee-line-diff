@@ -1,0 +1,13 @@
+# Codex skill manifest（agentskills.io 标准 + Codex UI/policy/dependencies）。
+# 和 .claude-plugin/plugin.json 并存：Claude Code/ZCode 用 .claude-plugin，
+# Codex 用本文件。SKILL.md / scripts/ / hooks/hooks.json 三者通用。
+interface:
+  display_name: "山东高考录取数据整理"
+  short_description: "大绿本招生计划 × 近三年线差 → 按专业匹配整理成带线差的表"
+  default_prompt: "整理 data/ 里的山东高考录取数据"
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []
