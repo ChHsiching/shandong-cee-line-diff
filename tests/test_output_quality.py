@@ -326,7 +326,7 @@ def test_write_new_major_table_maps_fields_to_columns(tmp_path: Path) -> None:
             "log": "新增专业：估算=同校同选科(3)均值=88.5",
         }
     ]
-    out = tmp_path / "新增专业.xlsx"
+    out = tmp_path / "今年新增往年没有的专业.xlsx"
     write_new_major_table(rows, out)
     data = _load_xlsx(out)
     # header: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 退化级别 / 样本量 / 日志

@@ -52,9 +52,8 @@ __all__ = [
 # Logs marking a match as 判断型 (needs second-pass verification, V5-0).
 # Strict-exact (LOG_STRICT) is构造确定 and excluded.
 JUDGMENT_LOG_PREFIXES: tuple[str, ...] = (
-    LOG_COARSE_CANDIDATE,  # 粗筛匹配：核心名唯一
-    LOG_COARSE_CANDIDATE,  # 粗筛匹配：括号子集消歧
-    LOG_SEMANTIC_PREFIX,  # 语义匹配 (matched)
+    LOG_COARSE_CANDIDATE,  # 核心名匹配（#5 后 pipeline 不产生；保留兼容旧 jsonl/测试）
+    LOG_SEMANTIC_PREFIX,  # agent 语义匹配 (matched)
 )
 
 # Demote log prefix injected into special-table EdgeRows for存疑 verdicts.

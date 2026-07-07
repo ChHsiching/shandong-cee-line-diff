@@ -71,7 +71,11 @@ def extract_j3_early_pairs(rows: Iterable[Sequence]) -> list[tuple[str, str]]:
             continue
         if batch != "提前批":
             continue
-        code = str(row[_J3_SCHOOLCODE]) if len(row) > _J3_SCHOOLCODE and row[_J3_SCHOOLCODE] is not None else ""
+        code = (
+            str(row[_J3_SCHOOLCODE])
+            if len(row) > _J3_SCHOOLCODE and row[_J3_SCHOOLCODE] is not None
+            else ""
+        )
         major = row[_J3_MAJORNAME] if len(row) > _J3_MAJORNAME else None
         out.append((code, nfk(major)))
     return out
@@ -90,7 +94,11 @@ def extract_tq_benke_pairs(rows: Iterable[Sequence]) -> list[tuple[str, str]]:
         batch = row[_TQ_BATCH] if len(row) > _TQ_BATCH else None
         if batch not in _TQ_BENKE_BATCHES:
             continue
-        code = str(row[_TQ_SCHOOLCODE]) if len(row) > _TQ_SCHOOLCODE and row[_TQ_SCHOOLCODE] is not None else ""
+        code = (
+            str(row[_TQ_SCHOOLCODE])
+            if len(row) > _TQ_SCHOOLCODE and row[_TQ_SCHOOLCODE] is not None
+            else ""
+        )
         major = row[_TQ_MAJORNAME] if len(row) > _TQ_MAJORNAME else None
         out.append((code, nfk(major)))
     return out

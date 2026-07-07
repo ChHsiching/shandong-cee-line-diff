@@ -233,8 +233,11 @@ def test_apply_rename_rejects_confidence_out_of_range(
         ],
     )
     with pytest.raises(RenameContractError):
-        apply_rename([jsonl], [DaglubenRow(school="新大学甲", src_row_idx=1)],
-                     [HistoryRow(school="旧大学甲")])
+        apply_rename(
+            [jsonl],
+            [DaglubenRow(school="新大学甲", src_row_idx=1)],
+            [HistoryRow(school="旧大学甲")],
+        )
 
 
 def test_apply_rename_rejects_missing_required_fields(
@@ -244,13 +247,20 @@ def test_apply_rename_rejects_missing_required_fields(
         tmp_path,
         "rename_result.jsonl",
         [
-            {"new_school": "新大学甲", "old_school": "", "confidence": 0.9,
-             "is_rename": True},
+            {
+                "new_school": "新大学甲",
+                "old_school": "",
+                "confidence": 0.9,
+                "is_rename": True,
+            },
         ],
     )
     with pytest.raises(RenameContractError):
-        apply_rename([jsonl], [DaglubenRow(school="新大学甲", src_row_idx=1)],
-                     [HistoryRow(school="旧大学甲")])
+        apply_rename(
+            [jsonl],
+            [DaglubenRow(school="新大学甲", src_row_idx=1)],
+            [HistoryRow(school="旧大学甲")],
+        )
 
 
 def test_apply_rename_rejects_new_school_not_in_dagluben_unique(
@@ -270,8 +280,10 @@ def test_apply_rename_rejects_new_school_not_in_dagluben_unique(
         ],
     )
     dgl_rows = [DaglubenRow(school="共有大学", major="数学", src_row_idx=1)]
-    hist_rows = [HistoryRow(school="共有大学", major="数学"),
-                 HistoryRow(school="旧大学甲", major="x")]
+    hist_rows = [
+        HistoryRow(school="共有大学", major="数学"),
+        HistoryRow(school="旧大学甲", major="x"),
+    ]
     with pytest.raises(RenameContractError):
         apply_rename([jsonl], dgl_rows, hist_rows)
 

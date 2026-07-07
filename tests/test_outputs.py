@@ -22,6 +22,7 @@ from scripts.structured_log import split_log
 
 # --- helpers ---------------------------------------------------------------
 
+
 def _read_sheet(path: Path):
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb.active
@@ -68,6 +69,7 @@ def _row_end(row: list) -> list:
 
 
 # --- hierarchical output: structure (19 columns) --------------------------
+
 
 def test_hierarchical_header_row_has_exactly_19_columns(
     minimal_hierarchical_dagluben, tmp_path
@@ -157,8 +159,9 @@ def test_hierarchical_zhuanke_row_carries_专科_stage(
     """分层版 专科 专业行: 匹配方式=专科（超范围）, 备注 empty (spec §3)."""
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=LOG_STRICT),
-        MatchResult(src_row_idx=6, matched=True, J=10.0, T=1.0,
-                    log="核心名匹配：核心专业名相同"),
+        MatchResult(
+            src_row_idx=6, matched=True, J=10.0, T=1.0, log="核心名匹配：核心专业名相同"
+        ),
     ]
     out = tmp_path / "hier.xlsx"
     write_outputs.write_hierarchical(
@@ -176,6 +179,7 @@ def test_hierarchical_zhuanke_row_carries_专科_stage(
 
 
 # --- hierarchical output: 5 structured-column values ----------------------
+
 
 def test_hierarchical_structured_5_columns_match_split_log(
     minimal_hierarchical_dagluben, tmp_path
@@ -200,6 +204,7 @@ def test_hierarchical_structured_5_columns_match_split_log(
 
 # --- flat output: structure (19 columns) ----------------------------------
 
+
 def test_flat_header_row_has_exactly_19_columns(
     minimal_hierarchical_dagluben, tmp_path
 ):
@@ -218,11 +223,26 @@ def test_flat_keeps_only_major_rows_with_all_fields(
     minimal_hierarchical_dagluben, tmp_path
 ):
     results = [
-        MatchResult(src_row_idx=5, school="示例大学", school_cat="普通计划",
-                    major="计算机科学与技术", matched=True,
-                    J=60.0, T=5.0, log=LOG_STRICT),
-        MatchResult(src_row_idx=6, school="示例大学", school_cat="普通计划",
-                    major="英语", matched=False, J=None, T=None, log="未命中"),
+        MatchResult(
+            src_row_idx=5,
+            school="示例大学",
+            school_cat="普通计划",
+            major="计算机科学与技术",
+            matched=True,
+            J=60.0,
+            T=5.0,
+            log=LOG_STRICT,
+        ),
+        MatchResult(
+            src_row_idx=6,
+            school="示例大学",
+            school_cat="普通计划",
+            major="英语",
+            matched=False,
+            J=None,
+            T=None,
+            log="未命中",
+        ),
     ]
     out = tmp_path / "flat.xlsx"
     write_outputs.write_flat(minimal_hierarchical_dagluben, results, out)
@@ -270,19 +290,19 @@ def test_flat_structured_5_columns_match_split_log(
 
 # --- flat output: 专科 exclusion (unchanged behaviour) --------------------
 
+
 def test_flat_still_excludes_zhuanke_rows(
     minimal_hierarchical_dagluben_with_zhuanke, tmp_path
 ):
     """Flat version continues to drop 专科 专业行 (spec §3, unchanged)."""
     results = [
         MatchResult(src_row_idx=5, matched=True, J=60.0, T=5.0, log=LOG_STRICT),
-        MatchResult(src_row_idx=6, matched=True, J=70.0, T=2.0,
-                    log="核心名匹配：核心专业名相同"),
+        MatchResult(
+            src_row_idx=6, matched=True, J=70.0, T=2.0, log="核心名匹配：核心专业名相同"
+        ),
     ]
     out = tmp_path / "flat.xlsx"
-    write_outputs.write_flat(
-        minimal_hierarchical_dagluben_with_zhuanke, results, out
-    )
+    write_outputs.write_flat(minimal_hierarchical_dagluben_with_zhuanke, results, out)
     rows = _read_sheet(out)
     # Only 2 major rows (本科); 专科 row excluded.
     assert len(rows) == 3  # header + 2

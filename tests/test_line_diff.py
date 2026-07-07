@@ -19,6 +19,7 @@ from scripts.constants import ONE_LINE
 
 # --- three-year case (RED sample from the task spec) -----------------------
 
+
 def test_compute_three_year_mean_and_pstdev():
     lows = {2025: 524, 2024: 568, 2023: 500}
     # line diffs: 524-441=83, 568-444=124, 500-443=57
@@ -37,6 +38,7 @@ def test_compute_three_year_stat_rounded_value():
 
 # --- single-year case ------------------------------------------------------
 
+
 def test_compute_single_year_uses_that_year_no_stddev():
     # 500 - 441 (2025 一段线) = 59
     stat, std = line_diff.compute({2025: 500}, ONE_LINE)
@@ -45,6 +47,7 @@ def test_compute_single_year_uses_that_year_no_stddev():
 
 
 # --- all-missing case ------------------------------------------------------
+
 
 def test_compute_all_none_returns_none_pair():
     stat, std = line_diff.compute({2025: None, 2024: None, 2023: None}, ONE_LINE)
@@ -60,6 +63,7 @@ def test_compute_empty_returns_none_pair():
 
 # --- partial years: None filtered, pstdev over the rest --------------------
 
+
 def test_compute_partial_years_filters_none():
     # 2025=524 → 83, 2023=500 → 57; 2024 missing
     stat, std = line_diff.compute({2025: 524, 2024: None, 2023: 500}, ONE_LINE)
@@ -69,6 +73,7 @@ def test_compute_partial_years_filters_none():
 
 # --- low_score missing the year entirely is treated as None ----------------
 
+
 def test_compute_year_only_in_provincial_lines_not_in_lows_is_skipped():
     # lows has only 2025; provincial_lines has all three. 2024/2023 simply absent.
     stat, std = line_diff.compute({2025: 500}, ONE_LINE)
@@ -77,6 +82,7 @@ def test_compute_year_only_in_provincial_lines_not_in_lows_is_skipped():
 
 
 # --- string-coerced numerics (xlsx cells sometimes arrive as str) ----------
+
 
 def test_compute_coerces_string_numerics():
     stat, _ = line_diff.compute({2025: "524"}, ONE_LINE)  # type: ignore[arg-type]
@@ -91,6 +97,7 @@ def test_compute_treats_empty_string_as_missing():
 
 
 # --- provincial_lines is the second arg (order-safety) ---------------------
+
 
 def test_compute_provincial_lines_is_second_argument():
     """If a caller swapped the args, the maths would not work. Lock the order:

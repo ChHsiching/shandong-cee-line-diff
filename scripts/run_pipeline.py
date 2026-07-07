@@ -329,7 +329,7 @@ def _build_main_results(
             )
         else:
             # 特殊: 未匹配本科。spec 要求每行都有日志，兜底发特殊情况日志
-            # （详情见 output/特殊情况.xlsx）。
+            # （详情见 output/未能匹配的专业.xlsx）。
             from scripts.constants import LOG_SPECIAL_UNMATCHED
 
             by_idx[idx] = MatchResult(
@@ -499,7 +499,7 @@ def run(
                 "log": est.get("log", ""),
             }
         )
-    write_new_major_table(new_major_rows, out_dir / "新增专业.xlsx")
+    write_new_major_table(new_major_rows, out_dir / "今年新增往年没有的专业.xlsx")
     logger.info("Stage3 新增专业: %d", len(new_majors))
 
     # --- 改名表写出（_apply_rename 已在 Stage 0 后跑；这里只 enrich + write）---
@@ -515,7 +515,7 @@ def run(
         for dm in deleted_pool
         if (dm.get("school", ""), dm.get("major", "")) not in dgl_school_major
     ]
-    write_deleted_major_table(true_deleted, out_dir / "被删旧专业.xlsx")
+    write_deleted_major_table(true_deleted, out_dir / "往年有但今年停招的专业.xlsx")
 
     # New-school / gone-school tables: 大绿本独有校 / 历史独有校 minus rename.
     major_count: dict[str, int] = collections.Counter(
@@ -534,11 +534,11 @@ def run(
     ]
     write_new_school_table(
         [{"new_school": s, "major_count_2026": major_count[s]} for s in dgl_unique],
-        out_dir / "新增校表.xlsx",
+        out_dir / "今年新招生的学校.xlsx",
     )
     write_gone_school_table(
         [{"old_school": s} for s in hist_unique],
-        out_dir / "停招消失校表.xlsx",
+        out_dir / "往年有今年停招的学校.xlsx",
     )
 
     # --- V5-0 second-pass verification apply (Plan v2 阻断2) ----------------
@@ -621,7 +621,7 @@ def run(
     flight = [d for d in remaining_unmatched if d.get("batch") == FLIGHT_BATCH]
     other = [d for d in remaining_unmatched if d.get("batch") != FLIGHT_BATCH]
     special_rows = flight_and_special(flight, other, demoted_map=demoted_map)
-    write_special_table(special_rows, out_dir / "特殊情况.xlsx")
+    write_special_table(special_rows, out_dir / "未能匹配的专业.xlsx")
 
     # --- Outputs (hierarchical + flat, same MatchResult source) ------------
     main_results = _build_main_results(
@@ -636,12 +636,12 @@ def run(
     write_hierarchical(
         dl_path,
         main_results,
-        out_dir / "大绿本_附线差_分层版.xlsx",
+        out_dir / "大绿本_完整版_含线差.xlsx",
     )
     write_flat(
         dl_path,
         main_results,
-        out_dir / "大绿本_附线差_扁平版.xlsx",
+        out_dir / "大绿本_专业列表_含线差.xlsx",
     )
 
     # --- Source immutability guard (after) ---------------------------------

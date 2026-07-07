@@ -32,21 +32,28 @@ def main() -> int:
         description="Extract judgmental matches into verify batches (V5-0).",
     )
     parser.add_argument(
-        "--data-dir", type=Path, default=Path("data"),
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
         help="Directory holding the three source xlsx (default: data)",
     )
     parser.add_argument(
-        "--out-dir", type=Path, default=Path("output"),
+        "--out-dir",
+        type=Path,
+        default=Path("output"),
         help="Directory for final xlsx outputs (default: output)",
     )
     parser.add_argument(
-        "--semantic-dir", type=Path, default=Path("semantic-match"),
+        "--semantic-dir",
+        type=Path,
+        default=Path("semantic-match"),
         help="Directory for agent prompts/results (default: semantic-match)",
     )
     parser.add_argument(
-        "--no-agent-results", action="store_true",
+        "--no-agent-results",
+        action="store_true",
         help="Do not apply batch_*_result.jsonl when extracting judgmental "
-             "matches (use the strict+coarse-only口径).",
+        "matches (use the strict+coarse-only口径).",
     )
     args = parser.parse_args()
 
@@ -85,7 +92,9 @@ def main() -> int:
     # Filter judgmental matches (V5-0): coarse + agent-semantic matched rows.
     judgmental = [r for r in main_results if _is_judgmental(r)]
 
-    batches = build_verify_batches(judgmental, dagluben_rows, history, batch_size=BATCH_SIZE)
+    batches = build_verify_batches(
+        judgmental, dagluben_rows, history, batch_size=BATCH_SIZE
+    )
     # Clear stale verify_batch_*.json so a re-run does not leave orphans.
     for stale in sorted(args.semantic_dir.glob("verify_batch_*.json")):
         stale.unlink()
@@ -115,6 +124,7 @@ def _is_judgmental(match: dict) -> bool:
 
 def _coerce_history(row: dict) -> HistoryRow:
     """Coerce a CSV dict row into a typed HistoryRow (J/T → float|None)."""
+
     def _num(v: str) -> float | None:
         if v is None or v.strip() == "":
             return None

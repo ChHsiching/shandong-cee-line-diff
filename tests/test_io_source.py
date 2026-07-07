@@ -10,6 +10,7 @@ from scripts import io_source
 
 # --- sha256 ---------------------------------------------------------------
 
+
 def test_sha256_is_stable(tmp_xlsx):
     path = tmp_xlsx([["a", "b"], [1, 2]])
     h1 = io_source.sha256(path)
@@ -30,6 +31,7 @@ def test_sha256_changes_when_bytes_change(tmp_xlsx):
 
 # --- assert_unchanged -----------------------------------------------------
 
+
 def test_assert_unchanged_silent_when_match(tmp_xlsx):
     path = tmp_xlsx([["x"], [1]])
     h = io_source.sha256(path)
@@ -46,6 +48,7 @@ def test_assert_unchanged_raises_on_drift(tmp_xlsx):
 
 
 # --- load_source ----------------------------------------------------------
+
 
 def test_load_source_returns_read_only_workbook(tmp_xlsx):
 
@@ -71,6 +74,7 @@ def test_load_source_accepts_explicit_read_only(tmp_xlsx):
 
 
 # --- Python 3.14 smoke: real source via read_only, no DeprecationWarning ----
+
 
 def test_real_source_loads_without_deprecation_warning(repo_root):
     """Plan v2 binding: openpyxl read_only on the largest source under

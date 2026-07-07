@@ -68,7 +68,11 @@ def _dagluben(school: str, subject: str) -> DaglubenRow:
 
 
 def _hist(
-    school: str, subject: str, j: float | None, *, cat: str = "",
+    school: str,
+    subject: str,
+    j: float | None,
+    *,
+    cat: str = "",
     t: float | None = None,
 ) -> HistoryRow:
     return HistoryRow(
@@ -87,8 +91,8 @@ def test_estimate_level0_same_school_same_subject_average() -> None:
     history = [
         _hist("示例大学", "物理 | 物理和化学", 80.0),  # compatible
         _hist("示例大学", "物理和化学和生物", 100.0),  # compatible (superset)
-        _hist("示例大学", "历史", 50.0),               # not compatible
-        _hist("其他大学", "物理和化学", 999.0),        # other school
+        _hist("示例大学", "历史", 50.0),  # not compatible
+        _hist("其他大学", "物理和化学", 999.0),  # other school
         _hist("示例大学", "物理 | 物理和化学", None),  # compatible but no J
     ]
     result = estimate(new_major, history)
@@ -159,7 +163,7 @@ def test_estimate_level0_prefers_level0_when_both_available() -> None:
     new_major = _dagluben("示例大学", "物理和化学")
     history = [
         _hist("示例大学", "物理和化学", 80.0),  # level0 candidate
-        _hist("示例大学", "历史", 200.0),        # would skew level1
+        _hist("示例大学", "历史", 200.0),  # would skew level1
     ]
     result = estimate(new_major, history)
     assert result["level"] == 0
@@ -189,13 +193,15 @@ def test_estimate_level0_returns_T_same_school_same_subject_average() -> None:
     history = [
         _hist("示例大学", "物理 | 物理和化学", 80.0, t=10.0),  # compatible, has J and T
         _hist("示例大学", "物理和化学和生物", 100.0, t=20.0),  # compatible, has J and T
-        _hist("示例大学", "物理 | 物理和化学", 90.0, t=None),  # compatible J, no T (T-excluded)
-        _hist("示例大学", "历史", 50.0, t=999.0),              # not compatible
+        _hist(
+            "示例大学", "物理 | 物理和化学", 90.0, t=None
+        ),  # compatible J, no T (T-excluded)
+        _hist("示例大学", "历史", 50.0, t=999.0),  # not compatible
     ]
     result = estimate(new_major, history)
     assert result["level"] == 0
     assert result["value"] == round((80.0 + 100.0 + 90.0) / 3, 2)
-    assert result["T"] == 15.0       # mean(10, 20) — excludes None row
+    assert result["T"] == 15.0  # mean(10, 20) — excludes None row
     assert result["n"] == 3
 
 
@@ -224,7 +230,7 @@ def test_estimate_level1_returns_T_whole_school_average() -> None:
     result = estimate(new_major, history)
     assert result["level"] == 1
     assert result["value"] == 60.0  # mean(50, 70)
-    assert result["T"] == 10.0       # mean(5, 15)
+    assert result["T"] == 10.0  # mean(5, 15)
 
 
 def test_estimate_level2_T_is_none_when_no_history() -> None:

@@ -1,6 +1,7 @@
 """PRODUCTION-RUN orchestration (not a pipeline feature; coverage-exempt).
 STEP A: 把 Stage1.5 未命中里「有同校候选」的项重排成聚焦 agent 批；
 无候选项自动写 null 结果（归新增）。"""
+
 import json
 import glob
 
@@ -24,16 +25,23 @@ def main():
                 cand_items.append(it)
             else:
                 null_results.append(
-                    {"src_row_idx": idx, "match": None, "J": None, "T": None,
-                     "reason": "无同校候选，归新增"}
+                    {
+                        "src_row_idx": idx,
+                        "match": None,
+                        "J": None,
+                        "T": None,
+                        "reason": "无同校候选，归新增",
+                    }
                 )
 
     # 聚焦批
     n_batches = (len(cand_items) + FOCUS_SIZE - 1) // FOCUS_SIZE
     for i in range(n_batches):
-        chunk = cand_items[i * FOCUS_SIZE:(i + 1) * FOCUS_SIZE]
+        chunk = cand_items[i * FOCUS_SIZE : (i + 1) * FOCUS_SIZE]
         out = {"batch": i + 1, "items": chunk}
-        with open(f"{SM_DIR}/agent_batch_{i+1:03d}.json", "w", encoding="utf-8") as fh:
+        with open(
+            f"{SM_DIR}/agent_batch_{i + 1:03d}.json", "w", encoding="utf-8"
+        ) as fh:
             json.dump(out, fh, ensure_ascii=False, indent=1)
 
     # 无候选 null 结果
@@ -43,7 +51,7 @@ def main():
 
     print(f"有候选(聚焦批): {len(cand_items)} 项 → {n_batches} 批 (agent_batch_*.json)")
     print(f"无候选(自动null): {len(null_results)} 项 → auto_null_result.jsonl")
-    print(f"合计: {len(cand_items)+len(null_results)} 项")
+    print(f"合计: {len(cand_items) + len(null_results)} 项")
 
 
 if __name__ == "__main__":

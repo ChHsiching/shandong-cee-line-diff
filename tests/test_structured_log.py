@@ -4,7 +4,7 @@ split_log takes the legacy single「匹配日志」string produced by iteration-
 and parses it into 5 structured columns (匹配方式 / 仅一年数据 / 选科要求跨年变化 /
 二次复核 / 原因说明) without losing information.
 
-Real log-prefix universe (sampled from output/大绿本_附线差_扁平版.xlsx on
+Real log-prefix universe (sampled from output/大绿本_专业列表_含线差.xlsx on
 2026-06-24, see plan v2 修订 binding): 严格匹配 / 核心名匹配 / 新增专业 /
 特殊情况 / agent 语义匹配 (all with「：」); plus prefix-without-colon markers
 新校/无历史 / 疑似改名校(见改名表). 专科（不在本次整理范围）appears only
@@ -15,7 +15,6 @@ still be parseable defensively.
 from __future__ import annotations
 
 from scripts.constants import (
-    LOG_COARSE_CANDIDATE,
     LOG_COARSE_CANDIDATE,
     LOG_SEMANTIC_PREFIX,
     LOG_SPECIAL_UNMATCHED,
@@ -30,9 +29,7 @@ from scripts.structured_log import split_log
 
 
 def test_strict_with_single_year_marker() -> None:
-    out = split_log(
-        f"{LOG_STRICT}；（仅一年数据，无标准差）"
-    )
+    out = split_log(f"{LOG_STRICT}；（仅一年数据，无标准差）")
     assert out["匹配方式"] == "严格匹配"
     assert out["仅一年数据"] == "是"
     assert out["选科要求跨年变化"] == ""
@@ -61,10 +58,7 @@ def test_coarse_unique_core_name() -> None:
 
 
 def test_coarse_disambig_with_drift() -> None:
-    log = (
-        f"{LOG_COARSE_CANDIDATE}（不限选考科目类专业）；"
-        f"{LOG_SUBJECT_NOTE}"
-    )
+    log = f"{LOG_COARSE_CANDIDATE}（不限选考科目类专业）；{LOG_SUBJECT_NOTE}"
     out = split_log(log)
     assert out["匹配方式"] == "核心名匹配"
     assert out["仅一年数据"] == ""
@@ -171,7 +165,11 @@ def test_keys_are_exactly_five_in_fixed_order() -> None:
     """Interface lock: 5 keys, exact names, fixed order."""
     out = split_log(LOG_STRICT)
     assert list(out.keys()) == [
-        "匹配方式", "仅一年数据", "选科要求跨年变化", "二次复核", "原因说明",
+        "匹配方式",
+        "仅一年数据",
+        "选科要求跨年变化",
+        "二次复核",
+        "原因说明",
     ]
 
 
@@ -184,7 +182,7 @@ def test_values_helper_returns_5_strings_in_order() -> None:
 
 
 def test_real_sample_strict_with_single_year_from_output() -> None:
-    """Real row pulled from output/大绿本_附线差_扁平版.xlsx — guards against
+    """Real row pulled from output/大绿本_专业列表_含线差.xlsx — guards against
     prefix-string drift in constants.py (the actual LOG_STRICT text)."""
     log = "严格匹配：归一化后专业名完全一致；（仅一年数据，无标准差）"
     out = split_log(log)

@@ -84,10 +84,9 @@ class Batch:
 
 
 def _same_school_cat(dl: DaglubenRow, h: HistoryRow) -> bool:
-    return (
-        dl.get("school", "") == h.get("school", "")
-        and normalise_cat(dl.get("school_cat", "")) == normalise_cat(h.get("school_cat", ""))
-    )
+    return dl.get("school", "") == h.get("school", "") and normalise_cat(
+        dl.get("school_cat", "")
+    ) == normalise_cat(h.get("school_cat", ""))
 
 
 def _core_compatible(dl_core: str, h_core: str) -> bool:
@@ -147,7 +146,9 @@ def build_batches(
     for d in unmatched_list:
         key = (d.get("school", ""), normalise_cat(d.get("school_cat", "")))
         pool = hist_by_school.get(key, [])
-        candidates = [h for h in pool if _core_compatible(d.get("core", ""), h.get("core", ""))]
+        candidates = [
+            h for h in pool if _core_compatible(d.get("core", ""), h.get("core", ""))
+        ]
         items.append(BatchItem(dagluben=d, candidates=candidates))
 
     batches: list[Batch] = []

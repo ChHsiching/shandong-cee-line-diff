@@ -33,10 +33,12 @@ from scripts.write_edge_tables import (
 def test_identify_new_majors_keeps_rows_with_no_core_match_in_school() -> None:
     # unmatched 大绿本专业；同校历史里无任何 core 名匹配 → 真·新增。
     unmatched = [
-        DaglubenRow(school="示例大学", core="人工智能", major="人工智能",
-                    src_row_idx=5),
-        DaglubenRow(school="示例大学", core="量子信息", major="量子信息",
-                    src_row_idx=6),
+        DaglubenRow(
+            school="示例大学", core="人工智能", major="人工智能", src_row_idx=5
+        ),
+        DaglubenRow(
+            school="示例大学", core="量子信息", major="量子信息", src_row_idx=6
+        ),
     ]
     history = [
         HistoryRow(school="示例大学", core="计算机", major="计算机"),
@@ -49,10 +51,12 @@ def test_identify_new_majors_keeps_rows_with_no_core_match_in_school() -> None:
 def test_identify_new_majors_excludes_rows_with_school_core_candidate() -> None:
     # 同校历史里存在同 core 名 → 不是真新增（归改名/无候选/特殊处理，不在本函数）。
     unmatched = [
-        DaglubenRow(school="示例大学", core="人工智能", major="人工智能",
-                    src_row_idx=5),
-        DaglubenRow(school="示例大学", core="计算机", major="计算机(新方向)",
-                    src_row_idx=7),
+        DaglubenRow(
+            school="示例大学", core="人工智能", major="人工智能", src_row_idx=5
+        ),
+        DaglubenRow(
+            school="示例大学", core="计算机", major="计算机(新方向)", src_row_idx=7
+        ),
     ]
     history = [
         HistoryRow(school="示例大学", core="计算机", major="计算机"),
@@ -64,8 +68,7 @@ def test_identify_new_majors_excludes_rows_with_school_core_candidate() -> None:
 def test_identify_new_majors_school_scoped_not_global() -> None:
     # core 名在 *别的学校* 出现不算同校候选 → 仍是新增。
     unmatched = [
-        DaglubenRow(school="甲大学", core="人工智能", major="人工智能",
-                    src_row_idx=1),
+        DaglubenRow(school="甲大学", core="人工智能", major="人工智能", src_row_idx=1),
     ]
     history = [
         HistoryRow(school="乙大学", core="人工智能", major="人工智能"),
@@ -91,17 +94,27 @@ def test_write_new_major_table_writes_estimate_and_level_and_log(
     # no compatible T) but the column and value must round-trip.
     rows = [
         {
-            "school": "示例大学", "major": "人工智能", "subject": "物理和化学",
-            "value": 80.0, "T": 12.5, "level": 0, "n": 2,
+            "school": "示例大学",
+            "major": "人工智能",
+            "subject": "物理和化学",
+            "value": 80.0,
+            "T": 12.5,
+            "level": 0,
+            "n": 2,
             "log": "新增专业：估算=同校同选科(2)均值=80.0",
         },
         {
-            "school": "全新大学", "major": "量子信息", "subject": "物理和化学",
-            "value": None, "T": None, "level": 2, "n": 0,
+            "school": "全新大学",
+            "major": "量子信息",
+            "subject": "物理和化学",
+            "value": None,
+            "T": None,
+            "level": 2,
+            "n": 0,
             "log": "新校/无历史，无法估算",
         },
     ]
-    out_path = tmp_path / "新增专业.xlsx"
+    out_path = tmp_path / "今年新增往年没有的专业.xlsx"
     write_new_major_table(rows, out_path)
 
     wb = openpyxl.load_workbook(out_path, read_only=True, data_only=True)
@@ -130,7 +143,7 @@ def test_write_new_major_table_writes_estimate_and_level_and_log(
 def test_write_new_major_table_empty_input_still_writes_header(
     tmp_path: Path,
 ) -> None:
-    out_path = tmp_path / "新增专业.xlsx"
+    out_path = tmp_path / "今年新增往年没有的专业.xlsx"
     write_new_major_table([], out_path)
     wb = openpyxl.load_workbook(out_path, read_only=True, data_only=True)
     ws = wb.active

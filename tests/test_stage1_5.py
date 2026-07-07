@@ -26,8 +26,15 @@ from scripts.models import DaglubenRow, HistoryRow
 
 def _hist(**kw) -> HistoryRow:
     base: HistoryRow = dict(  # type: ignore[assignment]
-        school="", school_cat="", major="", stripped="", core="",
-        subject="", J=None, T=None, source_table="常规批一段线",
+        school="",
+        school_cat="",
+        major="",
+        stripped="",
+        core="",
+        subject="",
+        J=None,
+        T=None,
+        source_table="常规批一段线",
     )
     base.update(kw)  # type: ignore[arg-type]
     return base
@@ -35,14 +42,21 @@ def _hist(**kw) -> HistoryRow:
 
 def _dl(**kw) -> DaglubenRow:
     base: DaglubenRow = dict(  # type: ignore[assignment]
-        school="", school_cat="普通计划", major="", stripped="", core="",
-        subject="", batch="4.常规批", src_row_idx=0,
+        school="",
+        school_cat="普通计划",
+        major="",
+        stripped="",
+        core="",
+        subject="",
+        batch="4.常规批",
+        src_row_idx=0,
     )
     base.update(kw)  # type: ignore[arg-type]
     return base
 
 
 # --- build_core_idx (RED) ---------------------------------------------------
+
 
 def test_build_core_idx_keys_by_school_cat_core():
     history = [
@@ -69,6 +83,7 @@ def test_build_core_idx_folds_default_cat_like_stage1():
 
 # --- match_coarse: unique candidate -> auto-accept (RED, 实证样例) -----------
 
+
 def test_match_coarse_unique_candidate_auto_accepts():
     """实证样例: 人大「经济学类(经济学、国民经济管理、…)」 core=经济学类,
     同校同类别仅 1 候选「经济学类」 -> 自动接受.
@@ -77,14 +92,24 @@ def test_match_coarse_unique_candidate_auto_accepts():
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="中国人民大学", school_cat="", major="经济学类",
-                  core="经济学类", J=72.0, T=4.0),
+            _hist(
+                school="中国人民大学",
+                school_cat="",
+                major="经济学类",
+                core="经济学类",
+                J=72.0,
+                T=4.0,
+            ),
         ]
     )
     unmatched = [
-        _dl(school="中国人民大学", school_cat="普通计划",
+        _dl(
+            school="中国人民大学",
+            school_cat="普通计划",
             major="经济学类(经济学、国民经济管理、能源经济、国际经济与贸易)",
-            core="经济学类", src_row_idx=10),
+            core="经济学类",
+            src_row_idx=10,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
 
@@ -104,14 +129,24 @@ def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
     name is the sole candidate for that (school, cat, core)."""
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="北航", school_cat="", major="数学与应用数学",
-                  core="数学与应用数学", J=80.0, T=2.0),
+            _hist(
+                school="北航",
+                school_cat="",
+                major="数学与应用数学",
+                core="数学与应用数学",
+                J=80.0,
+                T=2.0,
+            ),
         ]
     )
     unmatched = [
-        _dl(school="北航", school_cat="普通计划",
+        _dl(
+            school="北航",
+            school_cat="普通计划",
             major="数学与应用数学(拔尖学生培养计划)(含双学位项目)",
-            core="数学与应用数学", src_row_idx=7),
+            core="数学与应用数学",
+            src_row_idx=7,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
@@ -120,6 +155,7 @@ def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
 
 
 # --- match_coarse: multi-candidate bracket-subset disambiguation (RED) ------
+
 
 def test_match_coarse_multi_candidate_disambiguates_when_brackets_subset():
     """实证样例: 北航「数学与应用数学(拔尖学生培养计划)(含…)」.
@@ -133,18 +169,32 @@ def test_match_coarse_multi_candidate_disambiguates_when_brackets_subset():
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="北航", school_cat="",
-                  major="数学与应用数学(拔尖学生培养计划)", core="数学与应用数学",
-                  J=80.0, T=2.0),
-            _hist(school="北航", school_cat="",
-                  major="数学与应用数学(华罗庚班)", core="数学与应用数学",
-                  J=90.0, T=1.0),
+            _hist(
+                school="北航",
+                school_cat="",
+                major="数学与应用数学(拔尖学生培养计划)",
+                core="数学与应用数学",
+                J=80.0,
+                T=2.0,
+            ),
+            _hist(
+                school="北航",
+                school_cat="",
+                major="数学与应用数学(华罗庚班)",
+                core="数学与应用数学",
+                J=90.0,
+                T=1.0,
+            ),
         ]
     )
     unmatched = [
-        _dl(school="北航", school_cat="普通计划",
+        _dl(
+            school="北航",
+            school_cat="普通计划",
             major="数学与应用数学(拔尖学生培养计划)(含双学位项目)",
-            core="数学与应用数学", src_row_idx=11),
+            core="数学与应用数学",
+            src_row_idx=11,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
@@ -166,18 +216,31 @@ def test_match_coarse_multi_candidate_still_unmatched_when_ambiguous():
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="中国人民大学", school_cat="",
-                  major="计算机类(图灵实验班)", core="计算机类", J=70.0),
-            _hist(school="中国人民大学", school_cat="",
-                  major="计算机类(金融与大数据技术创新人才班)",
-                  core="计算机类", J=60.0),
+            _hist(
+                school="中国人民大学",
+                school_cat="",
+                major="计算机类(图灵实验班)",
+                core="计算机类",
+                J=70.0,
+            ),
+            _hist(
+                school="中国人民大学",
+                school_cat="",
+                major="计算机类(金融与大数据技术创新人才班)",
+                core="计算机类",
+                J=60.0,
+            ),
         ]
     )
     # dagluben全名 contains neither「图灵实验班」nor「金融与大数据技术创新人才班」.
     unmatched = [
-        _dl(school="中国人民大学", school_cat="普通计划",
+        _dl(
+            school="中国人民大学",
+            school_cat="普通计划",
             major="计算机类(AI全栈工程师计划)",
-            core="计算机类", src_row_idx=12),
+            core="计算机类",
+            src_row_idx=12,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 0
@@ -195,13 +258,19 @@ def test_match_coarse_multi_candidate_two_compatible_still_unmatched():
     core_idx = stage1_5_coarse.build_core_idx(
         [
             _hist(school="X大学", school_cat="", major="英语", core="英语", J=50.0),
-            _hist(school="X大学", school_cat="",
-                  major="英语(师范)", core="英语", J=55.0),
+            _hist(
+                school="X大学", school_cat="", major="英语(师范)", core="英语", J=55.0
+            ),
         ]
     )
     unmatched = [
-        _dl(school="X大学", school_cat="普通计划",
-            major="英语(师范)", core="英语", src_row_idx=13),
+        _dl(
+            school="X大学",
+            school_cat="普通计划",
+            major="英语(师范)",
+            core="英语",
+            src_row_idx=13,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     # bare「英语」(no brackets -> subset) + 「英语(师范)」 -> 2 compatible -> miss
@@ -211,13 +280,19 @@ def test_match_coarse_multi_candidate_two_compatible_still_unmatched():
 
 # --- match_coarse: no candidate -> still unmatched (RED) --------------------
 
+
 def test_match_coarse_no_candidate_leaves_unmatched():
     core_idx = stage1_5_coarse.build_core_idx(
         [_hist(school="北京大学", core="数学", J=50.0)]
     )
     unmatched = [
-        _dl(school="北京大学", school_cat="普通计划",
-            major="天体物理学", core="天体物理学", src_row_idx=9),
+        _dl(
+            school="北京大学",
+            school_cat="普通计划",
+            major="天体物理学",
+            core="天体物理学",
+            src_row_idx=9,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 0
@@ -227,6 +302,7 @@ def test_match_coarse_no_candidate_leaves_unmatched():
 
 # --- 选科 non-differentiation: subject never enters the coarse key (RED) ----
 
+
 def test_match_coarse_subject_drift_does_not_block_match():
     """Spec §5.4: 选科 = 非差异化 (policy drift). Construct a dagluben row with
     选科「物理和化学」 whose unique candidate has 选科「物理」: still matches
@@ -234,13 +310,18 @@ def test_match_coarse_subject_drift_does_not_block_match():
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="D大学", school_cat="", core="数学",
-                  subject="物理", J=60.0),
+            _hist(school="D大学", school_cat="", core="数学", subject="物理", J=60.0),
         ]
     )
     unmatched = [
-        _dl(school="D大学", school_cat="普通计划",
-            major="数学", core="数学", subject="物理和化学", src_row_idx=20),
+        _dl(
+            school="D大学",
+            school_cat="普通计划",
+            major="数学",
+            core="数学",
+            subject="物理和化学",
+            src_row_idx=20,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
@@ -254,8 +335,14 @@ def test_match_coarse_same_subject_no_drift_note():
         [_hist(school="D大学", core="数学", subject="物理和化学", J=60.0)]
     )
     unmatched = [
-        _dl(school="D大学", school_cat="普通计划",
-            major="数学", core="数学", subject="物理和化学", src_row_idx=21),
+        _dl(
+            school="D大学",
+            school_cat="普通计划",
+            major="数学",
+            core="数学",
+            subject="物理和化学",
+            src_row_idx=21,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert "选科要求跨年不同" not in accepted[0]["log"]
@@ -263,19 +350,30 @@ def test_match_coarse_same_subject_no_drift_note():
 
 # --- 招生类别 differentiation: different tracks never match via coarse (RED) -
 
+
 def test_match_coarse_different_category_never_matches():
     """Spec §5.2 element 6: 招生类别 is a differentiator. 普通 vs 中外合作
     same core name -> NOT in the same core bucket -> no candidate -> miss.
     """
     core_idx = stage1_5_coarse.build_core_idx(
         [
-            _hist(school="S大学", school_cat="中外合作办学",
-                  major="英语", core="英语", J=40.0),
+            _hist(
+                school="S大学",
+                school_cat="中外合作办学",
+                major="英语",
+                core="英语",
+                J=40.0,
+            ),
         ]
     )
     unmatched = [
-        _dl(school="S大学", school_cat="普通计划",
-            major="英语", core="英语", src_row_idx=22),
+        _dl(
+            school="S大学",
+            school_cat="普通计划",
+            major="英语",
+            core="英语",
+            src_row_idx=22,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 0
@@ -283,6 +381,7 @@ def test_match_coarse_different_category_never_matches():
 
 
 # --- combined Stage1 + Stage1.5 ordering (RED) ------------------------------
+
 
 def test_stage1_then_stage1_5_pipeline_combines_results():
     """Stage1 hits + Stage1.5 auto-accepts must compose into a single ordered
@@ -295,11 +394,21 @@ def test_stage1_then_stage1_5_pipeline_combines_results():
     dagluben = [
         _dl(school="A大学", stripped="数学", major="数学", core="数学", src_row_idx=1),
         # Stage1 strict miss but Stage1.5 unique core -> auto-accept
-        _dl(school="B大学", stripped="化学(含新能源)", major="化学(含新能源)",
-            core="化学", src_row_idx=2),
+        _dl(
+            school="B大学",
+            stripped="化学(含新能源)",
+            major="化学(含新能源)",
+            core="化学",
+            src_row_idx=2,
+        ),
         # No candidate at all
-        _dl(school="Z大学", stripped="天文学", major="天文学", core="天文学",
-            src_row_idx=3),
+        _dl(
+            school="Z大学",
+            stripped="天文学",
+            major="天文学",
+            core="天文学",
+            src_row_idx=3,
+        ),
     ]
     strict_results = stage1_strict.match_strict(dagluben, history)
 
@@ -319,6 +428,7 @@ def test_stage1_then_stage1_5_pipeline_combines_results():
 
 # --- Real-workbook smoke: ~74.4% cumulative auto (NOT RED) ------------------
 
+
 class TestStage1_5Smoke:
     """Smoke层: real regular-batch cumulative auto rate. Plan v2 binding:
     assert 72%-78% (prototype observed 74.4%). NOT part of RED."""
@@ -328,13 +438,15 @@ class TestStage1_5Smoke:
 
         wb_j3 = openpyxl.load_workbook(
             repo_root / "data" / "近三年学校批次专业线差统计.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows_j3 = list(wb_j3["统计结果"].iter_rows(values_only=True))
         wb_j3.close()
         wb_dl = openpyxl.load_workbook(
             repo_root / "data" / "山东省2026年大绿本招生计划.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows_dl = list(wb_dl[wb_dl.sheetnames[0]].iter_rows(values_only=True))
         wb_dl.close()
@@ -343,9 +455,7 @@ class TestStage1_5Smoke:
         dl = stage0_merge.build_dagluben_regular(rows_dl)
         strict_results = stage1_strict.match_strict(dl, hist)
 
-        unmatched_dl = [
-            dl[i] for i, r in enumerate(strict_results) if not r["matched"]
-        ]
+        unmatched_dl = [dl[i] for i, r in enumerate(strict_results) if not r["matched"]]
         core_idx = stage1_5_coarse.build_core_idx(hist)
         accepted, _still = stage1_5_coarse.match_coarse(unmatched_dl, core_idx)
 
@@ -364,11 +474,11 @@ SINGLE_YEAR_NOTE = "（仅一年数据，无标准差）"
 def test_match_coarse_unique_single_year_history_adds_no_stddev_note():
     """A coarse unique-candidate match whose history row has T=None must
     append the「(仅一年数据，无标准差)」note (V5-1)."""
-    history = [_hist(school="A大学", school_cat="", core="数学",
-                     major="数学", J=60.0, T=None)]
+    history = [
+        _hist(school="A大学", school_cat="", core="数学", major="数学", J=60.0, T=None)
+    ]
     idx = stage1_5_coarse.build_core_idx(history)
-    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)",
-                    src_row_idx=1)]
+    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)", src_row_idx=1)]
     accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
     assert len(accepted) == 1
     assert accepted[0]["T"] is None
@@ -379,14 +489,15 @@ def test_match_coarse_disambig_single_year_history_adds_no_stddev_note():
     """A coarse bracket-disambig match whose chosen candidate has T=None must
     append the note (exercises the disambig accept path, not just unique)."""
     history = [
-        _hist(school="A大学", school_cat="", core="数学",
-              major="数学(男)", J=60.0, T=None),
-        _hist(school="A大学", school_cat="", core="数学",
-              major="数学(女)", J=55.0, T=None),
+        _hist(
+            school="A大学", school_cat="", core="数学", major="数学(男)", J=60.0, T=None
+        ),
+        _hist(
+            school="A大学", school_cat="", core="数学", major="数学(女)", J=55.0, T=None
+        ),
     ]
     idx = stage1_5_coarse.build_core_idx(history)
-    dagluben = [_dl(school="A大学", core="数学", major="数学(男)",
-                    src_row_idx=1)]
+    dagluben = [_dl(school="A大学", core="数学", major="数学(男)", src_row_idx=1)]
     accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
     assert len(accepted) == 1
     assert SINGLE_YEAR_NOTE in accepted[0]["log"]
@@ -394,11 +505,11 @@ def test_match_coarse_disambig_single_year_history_adds_no_stddev_note():
 
 def test_match_coarse_multi_year_history_does_not_add_note():
     """A coarse match whose candidate carries a T must NOT get the note."""
-    history = [_hist(school="A大学", school_cat="", core="数学",
-                     major="数学", J=60.0, T=4.2)]
+    history = [
+        _hist(school="A大学", school_cat="", core="数学", major="数学", J=60.0, T=4.2)
+    ]
     idx = stage1_5_coarse.build_core_idx(history)
-    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)",
-                    src_row_idx=1)]
+    dagluben = [_dl(school="A大学", core="数学", major="数学(师范)", src_row_idx=1)]
     accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
     assert len(accepted) == 1
     assert SINGLE_YEAR_NOTE not in accepted[0]["log"]

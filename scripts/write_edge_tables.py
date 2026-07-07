@@ -9,11 +9,11 @@ Slice 5 implements the新增 (new-major) surface:
     - write_new_major_table(new_majors_with_estimate, out_path) -> None
 
 Slice 6 (this file, lower half) implements the remaining edge tables (spec §7):
-    - 被删旧专业.xlsx        (Task 6.1)
+    - 往年有但今年停招的专业.xlsx        (Task 6.1)
     - 学校改名表.xlsx        (Task 6.2)
-    - 新增校表.xlsx          (Task 6.2 — 未配对的大绿本独有校)
-    - 停招消失校表.xlsx      (Task 6.2 — 未配对的历史独有校)
-    - 特殊情况.xlsx          (Task 6.1 — 飞行不成/剩余无法匹配)
+    - 今年新招生的学校.xlsx          (Task 6.2 — 未配对的大绿本独有校)
+    - 往年有今年停招的学校.xlsx      (Task 6.2 — 未配对的历史独有校)
+    - 未能匹配的专业.xlsx          (Task 6.1 — 飞行不成/剩余无法匹配)
 
 iteration-2 Slice D (issue #13) removed two dead functions:
 ``mark_newmajor_in_main`` and ``mark_rename_in_main`` were never called by
@@ -91,12 +91,17 @@ def identify_new_majors(
     return out
 
 
-# 新增专业.xlsx columns. 统计线差估算 / 线差标准差估算 may be None
+# 今年新增往年没有的专业.xlsx columns. 统计线差估算 / 线差标准差估算 may be None
 # (level 2 / no compatible T); 退化级别 0/1/2.
 _NEW_MAJOR_HEADER: tuple[str, ...] = (
-    "学校", "专业", "选科",
-    "统计线差估算", "线差标准差估算",
-    "退化级别", "样本量", "日志",
+    "学校",
+    "专业",
+    "选科",
+    "统计线差估算",
+    "线差标准差估算",
+    "退化级别",
+    "样本量",
+    "日志",
 )
 
 # Map record dict keys (from write_new_major_table input) to header labels.
@@ -115,7 +120,7 @@ _NEW_MAJOR_KEY_TO_HEADER = {
 def write_new_major_table(
     new_majors_with_estimate: list[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``新增专业.xlsx`` with estimate value, T, level, sample size, log.
+    """Write ``今年新增往年没有的专业.xlsx`` with estimate value, T, level, sample size, log.
 
     Columns: 学校 / 专业 / 选科 / 统计线差估算 / 线差标准差估算 / 退化级别 /
     样本量 / 日志. The 统计线差估算 and 线差标准差估算 columns come directly
@@ -134,16 +139,18 @@ def write_new_major_table(
     ws.title = "新增专业"
     ws.append(list(_NEW_MAJOR_HEADER))
     for record in new_majors_with_estimate:
-        ws.append([
-            record.get("school", ""),
-            record.get("major", ""),
-            record.get("subject", ""),
-            record.get("value"),
-            record.get("T"),
-            record.get("level"),
-            record.get("n"),
-            record.get("log", ""),
-        ])
+        ws.append(
+            [
+                record.get("school", ""),
+                record.get("major", ""),
+                record.get("subject", ""),
+                record.get("value"),
+                record.get("T"),
+                record.get("level"),
+                record.get("n"),
+                record.get("log", ""),
+            ]
+        )
     wb.save(out_p)
     wb.close()
 
@@ -181,14 +188,19 @@ def _write_simple_table(
 # --- 被删旧专业 -------------------------------------------------------------
 
 _DELETED_HEADER: tuple[str, ...] = (
-    "学校", "招生类别", "专业", "近三年统计线差", "近三年线差标准差", "日志",
+    "学校",
+    "招生类别",
+    "专业",
+    "近三年统计线差",
+    "近三年线差标准差",
+    "日志",
 )
 
 
 def write_deleted_major_table(
     deleted: Sequence[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``被删旧专业.xlsx`` — history majors absent from 2026 at schools
+    """Write ``往年有但今年停招的专业.xlsx`` — history majors absent from 2026 at schools
     that still exist in 2026 (and are NOT renamed). Each row carries the
     original近三年 J/T and log ``近三年有、2026 大绿本无`` (spec §9).
 
@@ -211,13 +223,16 @@ def write_deleted_major_table(
 # --- 学校改名表 -------------------------------------------------------------
 
 _RENAME_HEADER: tuple[str, ...] = (
-    "2026新校名", "候选旧校名", "置信度", "2026本科专业数", "备注", "人工已核验",
+    "2026新校名",
+    "候选旧校名",
+    "置信度",
+    "2026本科专业数",
+    "备注",
+    "人工已核验",
 )
 
 
-def write_rename_table(
-    rename_rows: Sequence[RenameRow], out_path: str | Path
-) -> None:
+def write_rename_table(rename_rows: Sequence[RenameRow], out_path: str | Path) -> None:
     """Write ``学校改名表.xlsx`` (spec §7). The ``备注`` column holds the
     web-search summary (Task 6.3) and ``manual_reviewed`` is surfaced as a
     boolean column ``人工已核验`` so humans can see which备注 are curated.
@@ -248,7 +263,7 @@ _NEW_SCHOOL_HEADER: tuple[str, ...] = ("2026新校名", "2026本科专业数", "
 def write_new_school_table(
     new_schools: Sequence[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``新增校表.xlsx`` — 大绿本独有校 the agent did NOT pair with any
+    """Write ``今年新招生的学校.xlsx`` — 大绿本独有校 the agent did NOT pair with any
     history school (真新增校 / 无历史). Each record: ``{"new_school": str,
     "major_count_2026": int}``; the log is fixed."""
     rows = [
@@ -270,7 +285,7 @@ _GONE_SCHOOL_HEADER: tuple[str, ...] = ("历史旧校名", "日志")
 def write_gone_school_table(
     gone_schools: Sequence[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``停招消失校表.xlsx`` — 历史独有校 the agent did NOT pair (整校
+    """Write ``往年有今年停招的学校.xlsx`` — 历史独有校 the agent did NOT pair (整校
     缺席 2026, 含独立学院转设消失). Each record: ``{"old_school": str}``."""
     rows = [
         {
@@ -285,14 +300,21 @@ def write_gone_school_table(
 # --- 特殊情况 (飞行不成 / 剩余无法匹配) ------------------------------------
 
 _SPECIAL_HEADER: tuple[str, ...] = (
-    "src_row_idx", "学校", "招生类别", "专业", "核心名", "选科", "批次", "日志",
+    "src_row_idx",
+    "学校",
+    "招生类别",
+    "专业",
+    "核心名",
+    "选科",
+    "批次",
+    "日志",
 )
 
 
 def write_special_table(
     special_rows: Sequence[dict[str, Any]], out_path: str | Path
 ) -> None:
-    """Write ``特殊情况.xlsx`` — 飞行技术(军队) 提前批池匹配不成 + 其余无法
+    """Write ``未能匹配的专业.xlsx`` — 飞行技术(军队) 提前批池匹配不成 + 其余无法
     归类的大绿本行. Each EdgeRow preserves the originating DaglubenRow fields
     (src_row_idx / school / major / core / subject / batch) + log (spec §9).
 

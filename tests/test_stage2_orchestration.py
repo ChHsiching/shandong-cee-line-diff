@@ -114,7 +114,9 @@ def test_build_batches_groups_by_school_and_attaches_candidates() -> None:
 
 
 def test_build_batches_empty_unmatched_returns_empty() -> None:
-    assert build_batches([], [_hist("甲大学", "数学", "数学", 1.0)], batch_size=20) == []
+    assert (
+        build_batches([], [_hist("甲大学", "数学", "数学", 1.0)], batch_size=20) == []
+    )
 
 
 def test_build_batches_no_candidates_still_emits_item() -> None:
@@ -226,8 +228,10 @@ def test_apply_results_backfills_matched_and_null(tmp_path: Path) -> None:
 
     jsonl = tmp_path / "batch_01_result.jsonl"
     jsonl.write_text(
-        _result_line(1, "计算机类", 80.0, "核心名同、方向括号对齐") + "\n"
-        + _result_line(2, None, None, "无对应历史专业", None) + "\n",
+        _result_line(1, "计算机类", 80.0, "核心名同、方向括号对齐")
+        + "\n"
+        + _result_line(2, None, None, "无对应历史专业", None)
+        + "\n",
         encoding="utf-8",
     )
 
@@ -260,7 +264,9 @@ def test_apply_results_merges_multiple_jsonl(tmp_path: Path) -> None:
     j2 = tmp_path / "batch_02_result.jsonl"
     # Both echo their candidate's T (1.0 from _hist) so the J/T echo contract
     # passes and the merge itself is what's under test.
-    j1.write_text(_result_line(1, "数学", 90.0, "唯一同校候选") + "\n", encoding="utf-8")
+    j1.write_text(
+        _result_line(1, "数学", 90.0, "唯一同校候选") + "\n", encoding="utf-8"
+    )
     j2.write_text(
         json.dumps(
             {

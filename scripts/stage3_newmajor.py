@@ -169,7 +169,11 @@ def estimate(
     # 退化2: 整校无历史.
     if not same_school:
         return EstimateResult(
-            value=None, T=None, level=2, n=0, log="新校/无历史，无法估算",
+            value=None,
+            T=None,
+            level=2,
+            n=0,
+            log="新校/无历史，无法估算",
         )
 
     # 退化0: 同校 + 选科集合包含.
@@ -192,5 +196,9 @@ def estimate(
 
     # 同校历史行存在但全部 J=None → 仍无法估算，记 level2 口径.
     return EstimateResult(
-        value=None, T=None, level=2, n=0, log="新校/无历史，无法估算",
+        value=None,
+        T=None,
+        level=2,
+        n=0,
+        log="新校/无历史，无法估算",
     )

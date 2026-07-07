@@ -1,13 +1,13 @@
 """Output writers for the admission-data pipeline.
 
 Two products (spec §7):
-    - Hierarchical (大绿本_附线差_分层版.xlsx): a full copy of the大绿本
+    - Hierarchical (大绿本_完整版_含线差.xlsx): a full copy of the大绿本
       workbook with seven columns appended at the row end
       (近三年统计线差 / 近三年线差标准差 / 匹配方式 / 仅一年数据 / 选科要求跨年变化 /
       二次复核 / 原因说明). Every original row is preserved verbatim; non-major
       rows leave the seven new cells blank. Original columns are never
       overwritten.
-    - Flat (大绿本_附线差_扁平版.xlsx): only专业行, each with all original
+    - Flat (大绿本_专业列表_含线差.xlsx): only专业行, each with all original
       fields plus the seven appended columns.
 
 iteration-3 (structured-columns): the legacy single「匹配日志」cell is gone;
@@ -160,8 +160,7 @@ def write_hierarchical(
                 # 标注超范围 → split_log turns it into 匹配方式=专科（超范围）.
                 if "专科" in str(subtitle or ""):
                     structured = split_log(LOG_ZHUANKE_OUT_OF_SCOPE)
-                    ws.cell(row=row_idx, column=COL_STAGE,
-                            value=structured["匹配方式"])
+                    ws.cell(row=row_idx, column=COL_STAGE, value=structured["匹配方式"])
                     # J/T + other structured cells stay blank (专科 excluded).
                 continue
             _write_row_end(ws, row_idx, res)
@@ -197,17 +196,17 @@ def write_flat(
         # Header row: original 12 columns + 7 row-end labels.
         out_row = 1
         for col_idx in range(1, 13):
-            out_ws.cell(row=out_row, column=col_idx,
-                        value=src_ws.cell(row=1, column=col_idx).value)
+            out_ws.cell(
+                row=out_row,
+                column=col_idx,
+                value=src_ws.cell(row=1, column=col_idx).value,
+            )
         _write_header_row_end(out_ws, row_idx=out_row)
         out_row += 1
 
         for src_row_idx in range(2, src_ws.max_row + 1):
             # Read original row cells.
-            cells = [
-                src_ws.cell(row=src_row_idx, column=c).value
-                for c in range(1, 13)
-            ]
+            cells = [src_ws.cell(row=src_row_idx, column=c).value for c in range(1, 13)]
             if not _is_major_row(cells):
                 continue
             # 专科 专业行不在本次整理范围（仅本科），扁平版剔除。
@@ -220,8 +219,15 @@ def write_flat(
                 _write_row_end(out_ws, out_row, res)
             else:
                 # Defensive: blank the 7 row-end cells.
-                for col in (COL_J, COL_T, COL_STAGE, COL_SINGLE_YEAR,
-                            COL_DRIFT, COL_VERIFIED, COL_NOTE):
+                for col in (
+                    COL_J,
+                    COL_T,
+                    COL_STAGE,
+                    COL_SINGLE_YEAR,
+                    COL_DRIFT,
+                    COL_VERIFIED,
+                    COL_NOTE,
+                ):
                     out_ws.cell(row=out_row, column=col, value=None)
             out_row += 1
 

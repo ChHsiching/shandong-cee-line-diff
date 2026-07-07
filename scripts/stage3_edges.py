@@ -25,7 +25,11 @@ from __future__ import annotations
 
 from typing import Sequence, TypedDict
 
-from scripts.constants import LOG_DELETED, LOG_FLIGHT_UNMATCHED, LOG_VERIFY_DEMOTE_PREFIX
+from scripts.constants import (
+    LOG_DELETED,
+    LOG_FLIGHT_UNMATCHED,
+    LOG_VERIFY_DEMOTE_PREFIX,
+)
 from scripts.models import DaglubenRow, HistoryRow
 
 __all__ = [

@@ -33,7 +33,7 @@ _PREFIXED_STAGES: tuple[tuple[str, str], ...] = (
     ("agent 语义匹配", "agent 语义匹配"),
     ("新增专业", "新增专业"),
     ("未能匹配", "未能匹配"),
-    (LOG_VERIFY_DEMOTE_PREFIX, LOG_VERIFY_DEMOTE_PREFIX),   # 二次复核认为可能有误
+    (LOG_VERIFY_DEMOTE_PREFIX, LOG_VERIFY_DEMOTE_PREFIX),  # 二次复核认为可能有误
     ("专科", "专科"),
 )
 
@@ -89,7 +89,7 @@ def _match_prefixed(text: str) -> tuple[str, str]:
     for raw_label, stage in _PREFIXED_STAGES:
         prefix = raw_label + _COLON
         if text.startswith(prefix):
-            note = _strip_markers(text[len(prefix):])
+            note = _strip_markers(text[len(prefix) :])
             display = _STAGE_DISPLAY.get(stage, stage)
             if stage == "专科":
                 note = ""
@@ -118,7 +118,7 @@ def _strip_markers(note: str) -> str:
     if sy_idx != -1:
         close = out.find("）", sy_idx)
         if close != -1:
-            out = out[:sy_idx] + out[close + 1:]
+            out = out[:sy_idx] + out[close + 1 :]
         else:
             out = out[:sy_idx]
     # Drop the drift marker and its trailing tail.

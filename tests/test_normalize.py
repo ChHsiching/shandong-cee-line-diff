@@ -7,6 +7,7 @@ from scripts import normalize
 
 # --- nfk -------------------------------------------------------------------
 
+
 def test_nfk_normalises_fullwidth_and_whitespace():
     # full-width comma -> half-width, full-width parens -> half-width,
     # all whitespace removed.
@@ -23,18 +24,23 @@ def test_nfk_idempotent():
 
 # --- split_school ----------------------------------------------------------
 
+
 def test_split_school_empirical_examples_from_spec():
     assert normalize.split_school("三亚学院(中外合作办学)") == (
-        "三亚学院", "中外合作办学",
+        "三亚学院",
+        "中外合作办学",
     )
     assert normalize.split_school("山东中医药大学(地方专项计划)") == (
-        "山东中医药大学", "地方专项计划",
+        "山东中医药大学",
+        "地方专项计划",
     )
     assert normalize.split_school("山东建筑大学(走读)") == (
-        "山东建筑大学", "走读",
+        "山东建筑大学",
+        "走读",
     )
     assert normalize.split_school("桂林电子科技大学(边防军人子女预科班)") == (
-        "桂林电子科技大学", "边防军人子女预科班",
+        "桂林电子科技大学",
+        "边防军人子女预科班",
     )
 
 
@@ -45,11 +51,13 @@ def test_split_school_no_category_returns_school_and_empty():
 
 def test_split_school_handles_fullwidth_and_whitespace():
     assert normalize.split_school("三亚学院（中外合作办学）") == (
-        "三亚学院", "中外合作办学",
+        "三亚学院",
+        "中外合作办学",
     )
 
 
 # --- strip_ignore_brackets ------------------------------------------------
+
 
 def test_strip_ignore_brackets_removes_ignore_brackets():
     assert normalize.strip_ignore_brackets("临床医学(色盲考生不予录取)") == "临床医学"
@@ -57,10 +65,7 @@ def test_strip_ignore_brackets_removes_ignore_brackets():
         normalize.strip_ignore_brackets("数学与应用数学(男,通用标准合格)")
         == "数学与应用数学(男)"
     )
-    assert (
-        normalize.strip_ignore_brackets("护理学(女生身高不低于160cm)")
-        == "护理学"
-    )
+    assert normalize.strip_ignore_brackets("护理学(女生身高不低于160cm)") == "护理学"
 
 
 def test_strip_ignore_brackets_keeps_non_ignore_brackets():
@@ -76,9 +81,13 @@ def test_strip_ignore_brackets_no_brackets_passthrough():
 
 # --- core_of ---------------------------------------------------------------
 
+
 def test_core_of_strips_all_brackets():
     assert normalize.core_of("经济学类(经济学、国民经济管理)") == "经济学类"
-    assert normalize.core_of("理科试验班类(严济慈物理学拔尖人才班)(含物理学)") == "理科试验班类"
+    assert (
+        normalize.core_of("理科试验班类(严济慈物理学拔尖人才班)(含物理学)")
+        == "理科试验班类"
+    )
     assert normalize.core_of("数学与应用数学(男,通用标准合格)") == "数学与应用数学"
 
 
@@ -88,10 +97,9 @@ def test_core_of_no_brackets_passthrough():
 
 # --- diff_brackets ---------------------------------------------------------
 
+
 def test_diff_brackets_classifies_each_bracket():
-    result = normalize.diff_brackets(
-        "理科试验班类(严济慈物理学拔尖人才班)(含物理学)"
-    )
+    result = normalize.diff_brackets("理科试验班类(严济慈物理学拔尖人才班)(含物理学)")
     # expected: gender="" , cooperation="" , other includes 严济慈…
     kinds = {kind for kind, _val in result}
     assert "其他" in kinds

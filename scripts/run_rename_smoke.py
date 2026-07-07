@@ -8,13 +8,13 @@ Not part of the RED contract (Plan v2: smoke = "被删数 / 改名候选对数 /
 It materialises:
   - ``semantic-match/rename_candidates.jsonl`` + ``rename_prompt.md``
     (Task 6.2 — agent dispatch input).
-  - ``output/被删旧专业.xlsx`` (Task 6.1 — history majors absent from 2026 at
+  - ``output/往年有但今年停招的专业.xlsx`` (Task 6.1 — history majors absent from 2026 at
     schools still present and not renamed).
-  - ``output/新增校表.xlsx`` / ``output/停招消失校表.xlsx`` (Task 6.2 — unpaired
+  - ``output/今年新招生的学校.xlsx`` / ``output/往年有今年停招的学校.xlsx`` (Task 6.2 — unpaired
     独有校 in each direction).
 
 It does NOT run the agent rename pairing or WebSearch (harness tools).
-``学校改名表.xlsx`` / ``特殊情况.xlsx`` are produced after the agent + after
+``学校改名表.xlsx`` / ``未能匹配的专业.xlsx`` are produced after the agent + after
 Stage 2 classification respectively; this smoke run reports the candidate
 counts that feed them.
 """
@@ -86,16 +86,15 @@ def main() -> None:
     # --- Task 6.1 deleted majors (excludes renamed; here empty) -------------
     # 被删 = 近三年有 + 该校在2026 + 2026 缺该专业。本函数返回「该校在2026 +
     # 非改名校」的近三年历史行；再减去2026 大绿本(校,专业) 对即真被删。
-    dgl_school_major = {
-        (d.get("school", ""), d.get("major", "")) for d in dagluben
-    }
+    dgl_school_major = {(d.get("school", ""), d.get("major", "")) for d in dagluben}
     deleted_pool = deleted_majors(history, dgl_present, renamed_dgl)
     true_deleted = [
-        dm for dm in deleted_pool
+        dm
+        for dm in deleted_pool
         if (dm.get("school", ""), dm.get("major", "")) not in dgl_school_major
     ]
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    write_deleted_major_table(true_deleted, OUTPUT_DIR / "被删旧专业.xlsx")
+    write_deleted_major_table(true_deleted, OUTPUT_DIR / "往年有但今年停招的专业.xlsx")
 
     # --- Task 6.2 unpaired 独有校 (no agent → all 大绿本独有校 are "new") ----
     # 真实跑后 agent 把其中改名者挪入改名表; 剩余即新增校.
@@ -109,8 +108,8 @@ def main() -> None:
         {"new_school": s, "major_count_2026": major_count[s]} for s in dgl_unique
     ]
     gone_school_rows = [{"old_school": s} for s in hist_unique]
-    write_new_school_table(new_school_rows, OUTPUT_DIR / "新增校表.xlsx")
-    write_gone_school_table(gone_school_rows, OUTPUT_DIR / "停招消失校表.xlsx")
+    write_new_school_table(new_school_rows, OUTPUT_DIR / "今年新招生的学校.xlsx")
+    write_gone_school_table(gone_school_rows, OUTPUT_DIR / "往年有今年停招的学校.xlsx")
 
     # --- Task 6.1 special: flight-unmatched + remaining unmatched ------------
     # Smoke approximation: strict-match the full dagluben, treat unmatched as
@@ -122,7 +121,7 @@ def main() -> None:
     flight = [d for d in unmatched if d.get("batch") == FLIGHT_BATCH]
     other = [d for d in unmatched if d.get("batch") != FLIGHT_BATCH]
     special = flight_and_special(flight, other)
-    write_special_table(special, OUTPUT_DIR / "特殊情况.xlsx")
+    write_special_table(special, OUTPUT_DIR / "未能匹配的专业.xlsx")
 
     # --- Report --------------------------------------------------------------
     print("=== Slice 6 smoke (real data) ===")
@@ -133,7 +132,9 @@ def main() -> None:
     print(f"飞行技术(军队)未匹配:               {len(flight)}")
     print(f"剩余未匹配(进特殊表):               {len(other)}")
     print(f"产物: {SEMANTIC_DIR}/rename_candidates.jsonl, rename_prompt.md")
-    print(f"      {OUTPUT_DIR}/被删旧专业.xlsx, 新增校表.xlsx, 停招消失校表.xlsx, 特殊情况.xlsx")
+    print(
+        f"      {OUTPUT_DIR}/往年有但今年停招的专业.xlsx, 今年新招生的学校.xlsx, 往年有今年停招的学校.xlsx, 未能匹配的专业.xlsx"
+    )
     print()
     print("注: 本 smoke 不跑 agent / WebSearch. 学校改名表.xlsx + 改名校专业")
     print("    J/T 留空标记 待 harness 跑完 Task 6.2 agent 后产出.")

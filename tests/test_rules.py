@@ -22,8 +22,15 @@ from scripts.models import DaglubenRow, HistoryRow
 
 def _hist(**kw) -> HistoryRow:
     base: HistoryRow = dict(  # type: ignore[assignment]
-        school="", school_cat="", major="", stripped="", core="",
-        subject="", J=None, T=None, source_table="常规批一段线",
+        school="",
+        school_cat="",
+        major="",
+        stripped="",
+        core="",
+        subject="",
+        J=None,
+        T=None,
+        source_table="常规批一段线",
     )
     base.update(kw)  # type: ignore[arg-type]
     return base
@@ -31,8 +38,14 @@ def _hist(**kw) -> HistoryRow:
 
 def _dl(**kw) -> DaglubenRow:
     base: DaglubenRow = dict(  # type: ignore[assignment]
-        school="", school_cat="普通计划", major="", stripped="", core="",
-        subject="", batch="4.常规批", src_row_idx=0,
+        school="",
+        school_cat="普通计划",
+        major="",
+        stripped="",
+        core="",
+        subject="",
+        batch="4.常规批",
+        src_row_idx=0,
     )
     base.update(kw)  # type: ignore[arg-type]
     return base
@@ -46,18 +59,43 @@ def _dl_row(row: list) -> list:
 
 # === Rule 1: 专科 排除 (RED — lock 181 rows, both pools clean) ===============
 
+
 def test_build_dagluben_regular_excludes_zhuanke_subtitle_major_rows():
     """A 专科 subtitle must exclude the major row under it even if 代号/名称
     are both non-empty."""
     rows = [
         _dl_row(
-            ["批次", "小标题", "学校代码", "学校名", "代号", "名称",
-             "选科", "学制", "计划数", "备注", "年收费", "整行校准"]
+            [
+                "批次",
+                "小标题",
+                "学校代码",
+                "学校名",
+                "代号",
+                "名称",
+                "选科",
+                "学制",
+                "计划数",
+                "备注",
+                "年收费",
+                "整行校准",
+            ]
         ),
-        _dl_row(["4.常规批", "普通计划", "A001", "X大学", "01", "英语",
-                 "不限", "4", "1"]),
-        _dl_row(["4.常规批", "定向培养军士生(专科)", "C001", "D职业学院",
-                 "03", "护理", "不限", "3", "50"]),
+        _dl_row(
+            ["4.常规批", "普通计划", "A001", "X大学", "01", "英语", "不限", "4", "1"]
+        ),
+        _dl_row(
+            [
+                "4.常规批",
+                "定向培养军士生(专科)",
+                "C001",
+                "D职业学院",
+                "03",
+                "护理",
+                "不限",
+                "3",
+                "50",
+            ]
+        ),
     ]
     out = stage0_merge.build_dagluben_regular(rows)
     assert len(out) == 1
@@ -69,13 +107,33 @@ def test_build_dagluben_regular_excludes_zhuanke_subtitle_major_rows():
 def test_build_dagluben_early_excludes_zhuanke_subtitle_major_rows():
     """The same专科 exclusion applies to提前批 B类 (181 rows in real data)."""
     rows = [
+        _dl_row(["批次", "小标题", "学校代码", "学校名", "代号", "名称"]),
         _dl_row(
-            ["批次", "小标题", "学校代码", "学校名", "代号", "名称"]
+            [
+                "2.提前批B类",
+                "定向培养军士生(专科)",
+                "C001",
+                "D职业学院",
+                "03",
+                "护理",
+                "不限",
+                "3",
+                "50",
+            ]
         ),
-        _dl_row(["2.提前批B类", "定向培养军士生(专科)", "C001", "D职业学院",
-                 "03", "护理", "不限", "3", "50"]),
-        _dl_row(["2.提前批B类", "公安政法类", "P010", "公安大学", "01", "治安学",
-                 "历史", "4", "1"]),
+        _dl_row(
+            [
+                "2.提前批B类",
+                "公安政法类",
+                "P010",
+                "公安大学",
+                "01",
+                "治安学",
+                "历史",
+                "4",
+                "1",
+            ]
+        ),
     ]
     out = stage0_merge.build_dagluben_early(rows)
     assert len(out) == 1
@@ -91,7 +149,8 @@ class TestZhuankeSmoke:
 
         wb = openpyxl.load_workbook(
             repo_root / "data" / "山东省2026年大绿本招生计划.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows = list(wb[wb.sheetnames[0]].iter_rows(values_only=True))
         wb.close()
@@ -116,7 +175,8 @@ class TestZhuankeSmoke:
 
         wb = openpyxl.load_workbook(
             repo_root / "data" / "山东省2026年大绿本招生计划.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows = list(wb[wb.sheetnames[0]].iter_rows(values_only=True))
         wb.close()
@@ -134,16 +194,23 @@ class TestZhuankeSmoke:
 
 # === Rule 2: 选科 non-differentiation (RED — drift does not block match) =====
 
+
 def test_stage1_strict_ignores_subject_in_key():
     """Stage 1 key is (school, cat, stripped); 选科 is NOT in the key. Two
     rows with different 选科 but identical key still match."""
     history = [
-        _hist(school="D大学", school_cat="", stripped="数学",
-              subject="物理", J=60.0),
+        _hist(school="D大学", school_cat="", stripped="数学", subject="物理", J=60.0),
     ]
     dagluben = [
-        _dl(school="D大学", school_cat="普通计划", stripped="数学",
-            major="数学", core="数学", subject="物理和化学", src_row_idx=1),
+        _dl(
+            school="D大学",
+            school_cat="普通计划",
+            stripped="数学",
+            major="数学",
+            core="数学",
+            subject="物理和化学",
+            src_row_idx=1,
+        ),
     ]
     results = stage1_strict.match_strict(dagluben, history)
     assert results[0]["matched"] is True
@@ -157,8 +224,14 @@ def test_stage1_5_logs_subject_drift_when_subjects_differ():
         [_hist(school="D大学", school_cat="", core="数学", subject="物理", J=60.0)]
     )
     unmatched = [
-        _dl(school="D大学", school_cat="普通计划",
-            major="数学", core="数学", subject="物理和化学", src_row_idx=5),
+        _dl(
+            school="D大学",
+            school_cat="普通计划",
+            major="数学",
+            core="数学",
+            subject="物理和化学",
+            src_row_idx=5,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
@@ -169,12 +242,25 @@ def test_stage1_5_multi_value_subject_drift_also_logged():
     """近三年 subject is multi-value ~37.5% (e.g.「物理 | 物理和化学」). Treat
     any inequality (including multi-value) as drift and log it."""
     core_idx = stage1_5_coarse.build_core_idx(
-        [_hist(school="E大学", school_cat="", core="化学",
-               subject="物理|物理和化学", J=55.0)]
+        [
+            _hist(
+                school="E大学",
+                school_cat="",
+                core="化学",
+                subject="物理|物理和化学",
+                J=55.0,
+            )
+        ]
     )
     unmatched = [
-        _dl(school="E大学", school_cat="普通计划",
-            major="化学", core="化学", subject="化学", src_row_idx=6),
+        _dl(
+            school="E大学",
+            school_cat="普通计划",
+            major="化学",
+            core="化学",
+            subject="化学",
+            src_row_idx=6,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
@@ -183,15 +269,21 @@ def test_stage1_5_multi_value_subject_drift_also_logged():
 
 # === Rule 3: 招生类别 differentiation (RED — different tracks never match) ====
 
+
 def test_stage1_strict_different_category_blocks_match():
     """普通 vs 中外合作 (same school, same stripped) -> different key -> miss."""
     history = [
-        _hist(school="S大学", school_cat="中外合作办学",
-              stripped="英语", J=40.0),
+        _hist(school="S大学", school_cat="中外合作办学", stripped="英语", J=40.0),
     ]
     dagluben = [
-        _dl(school="S大学", school_cat="普通计划", stripped="英语",
-            major="英语", core="英语", src_row_idx=1),
+        _dl(
+            school="S大学",
+            school_cat="普通计划",
+            stripped="英语",
+            major="英语",
+            core="英语",
+            src_row_idx=1,
+        ),
     ]
     results = stage1_strict.match_strict(dagluben, history)
     assert results[0]["matched"] is False
@@ -204,8 +296,13 @@ def test_stage1_5_different_category_same_core_never_matches():
         [_hist(school="S大学", school_cat="中外合作办学", core="英语", J=40.0)]
     )
     unmatched = [
-        _dl(school="S大学", school_cat="普通计划",
-            major="英语", core="英语", src_row_idx=2),
+        _dl(
+            school="S大学",
+            school_cat="普通计划",
+            major="英语",
+            core="英语",
+            src_row_idx=2,
+        ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 0
@@ -216,12 +313,25 @@ def test_stage1_5_same_non_default_category_can_match():
     """Both sides with the same non-default category (e.g. 中外合作) share a
     bucket -> coarse match proceeds normally."""
     core_idx = stage1_5_coarse.build_core_idx(
-        [_hist(school="S大学", school_cat="中外合作办学",
-               core="英语", subject="物理", J=40.0)]
+        [
+            _hist(
+                school="S大学",
+                school_cat="中外合作办学",
+                core="英语",
+                subject="物理",
+                J=40.0,
+            )
+        ]
     )
     unmatched = [
-        _dl(school="S大学", school_cat="中外合作办学",
-            major="英语(师范)", core="英语", subject="物理和化学", src_row_idx=3),
+        _dl(
+            school="S大学",
+            school_cat="中外合作办学",
+            major="英语(师范)",
+            core="英语",
+            subject="物理和化学",
+            src_row_idx=3,
+        ),
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1

@@ -130,11 +130,11 @@ def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
 
 
 # --- 提前批 supplement columns (constants re-anchored here for readability) -
-TQ_BATCH = 0       # 批次名称
-TQ_CATEGORY = 1    # 招生类别 (B 列) — the differentiated admission track
+TQ_BATCH = 0  # 批次名称
+TQ_CATEGORY = 1  # 招生类别 (B 列) — the differentiated admission track
 TQ_SCHOOLNAME = 3  # 院校名称 (D 列)
-TQ_MAJORNAME = 5   # 专业名称 (F 列)
-TQ_SUBJECT = 6     # 选科 (G 列)
+TQ_MAJORNAME = 5  # 专业名称 (F 列)
+TQ_SUBJECT = 6  # 选科 (G 列)
 
 
 def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
@@ -309,12 +309,25 @@ def build_dagluben_early(rows: Iterable[Sequence]) -> list[DaglubenRow]:
 # --- intermediate CSV writers ---------------------------------------------
 
 _HISTORY_FIELDS: tuple[str, ...] = (
-    "school", "school_cat", "major", "stripped", "core",
-    "subject", "J", "T", "source_table",
+    "school",
+    "school_cat",
+    "major",
+    "stripped",
+    "core",
+    "subject",
+    "J",
+    "T",
+    "source_table",
 )
 _DAGLUBEN_FIELDS: tuple[str, ...] = (
-    "school", "school_cat", "major", "stripped", "core",
-    "subject", "batch", "src_row_idx",
+    "school",
+    "school_cat",
+    "major",
+    "stripped",
+    "core",
+    "subject",
+    "batch",
+    "src_row_idx",
 )
 
 

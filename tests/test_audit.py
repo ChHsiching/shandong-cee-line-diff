@@ -35,10 +35,25 @@ from scripts.audit_output import AuditReport, audit, main
 # 匹配方式 by name (not index), so we keep the column order aligned with
 # write_outputs for readability.
 HEADER = [
-    "批次", "小标题", "学校代码", "学校名", "代号", "名称",
-    "选考科目要求", "学制", "计划数", "学校备注", "年收费", "整行校准",
-    "近三年统计线差", "近三年线差标准差",
-    "匹配方式", "仅一年数据", "选科要求跨年变化", "二次复核", "原因说明",
+    "批次",
+    "小标题",
+    "学校代码",
+    "学校名",
+    "代号",
+    "名称",
+    "选考科目要求",
+    "学制",
+    "计划数",
+    "学校备注",
+    "年收费",
+    "整行校准",
+    "近三年统计线差",
+    "近三年线差标准差",
+    "匹配方式",
+    "仅一年数据",
+    "选科要求跨年变化",
+    "二次复核",
+    "原因说明",
 ]
 
 
@@ -69,41 +84,113 @@ def _good_output_dir(tmp_path: Path) -> Path:
     Hierarchical / flat carry three 本科 major rows:
       - 严格匹配 (src_row_idx=2)
       - 核心名匹配 (src_row_idx=3) — judgmental, confirmed in the verify jsonl
-      - 新增专业 (src_row_idx=4) — estimate row; J/T from 新增专业.xlsx
+      - 新增专业 (src_row_idx=4) — estimate row; J/T from 今年新增往年没有的专业.xlsx
     Each row carries the 5 structured columns directly (no legacy log cell).
     """
     out = tmp_path / "output"
     out.mkdir()
     hier_rows = [
         # strict matched (src_row_idx=2)
-        ["4.常规批", "普通计划", "A01", "示例大学", "01", "计算机",
-         "物理", "4", "2", "", "", "01计算机", 60.0, 5.0,
-         "严格匹配", "", "", "", "归一化专业名+招生类别一致"],
+        [
+            "4.常规批",
+            "普通计划",
+            "A01",
+            "示例大学",
+            "01",
+            "计算机",
+            "物理",
+            "4",
+            "2",
+            "",
+            "",
+            "01计算机",
+            60.0,
+            5.0,
+            "严格匹配",
+            "",
+            "",
+            "",
+            "归一化专业名+招生类别一致",
+        ],
         # coarse judgmental matched (src_row_idx=3) — confirmed
-        ["4.常规批", "普通计划", "A01", "示例大学", "02", "数学",
-         "物理", "4", "1", "", "", "02数学", 70.0, None,
-         "核心名匹配", "", "", "确定", "核心名唯一"],
+        [
+            "4.常规批",
+            "普通计划",
+            "A01",
+            "示例大学",
+            "02",
+            "数学",
+            "物理",
+            "4",
+            "1",
+            "",
+            "",
+            "02数学",
+            70.0,
+            None,
+            "核心名匹配",
+            "",
+            "",
+            "确定",
+            "核心名唯一",
+        ],
         # new major estimate (src_row_idx=4) — J/T from estimate, rounded
-        ["4.常规批", "普通计划", "A01", "示例大学", "03", "新专业",
-         "物理", "4", "1", "", "", "03新专业", 80.0, 4.0,
-         "新增专业", "", "", "", "估算=同校同选科(2)均值=80.0"],
+        [
+            "4.常规批",
+            "普通计划",
+            "A01",
+            "示例大学",
+            "03",
+            "新专业",
+            "物理",
+            "4",
+            "1",
+            "",
+            "",
+            "03新专业",
+            80.0,
+            4.0,
+            "新增专业",
+            "",
+            "",
+            "",
+            "估算=同校同选科(2)均值=80.0",
+        ],
     ]
-    _write_hier(out / "大绿本_附线差_分层版.xlsx", hier_rows)
-    _write_hier(out / "大绿本_附线差_扁平版.xlsx", hier_rows)
+    _write_hier(out / "大绿本_完整版_含线差.xlsx", hier_rows)
+    _write_hier(out / "大绿本_专业列表_含线差.xlsx", hier_rows)
     _write_edge(
-        out / "新增专业.xlsx",
-        ["学校", "专业", "选科", "统计线差估算", "线差标准差估算",
-         "退化级别", "样本量", "日志"],
-        [["示例大学", "新专业", "物理", 80.0, 4.0, 0, 2,
-          "新增专业：估算=同校同选科(2)均值=80.0"]],
+        out / "今年新增往年没有的专业.xlsx",
+        [
+            "学校",
+            "专业",
+            "选科",
+            "统计线差估算",
+            "线差标准差估算",
+            "退化级别",
+            "样本量",
+            "日志",
+        ],
+        [
+            [
+                "示例大学",
+                "新专业",
+                "物理",
+                80.0,
+                4.0,
+                0,
+                2,
+                "新增专业：估算=同校同选科(2)均值=80.0",
+            ]
+        ],
     )
     _write_edge(
-        out / "特殊情况.xlsx",
+        out / "未能匹配的专业.xlsx",
         ["src_row_idx", "学校", "招生类别", "专业", "核心名", "选科", "批次", "日志"],
         [[5, "他大学", "", "其他", "其他", "物理", "4.常规批", "无法匹配：剩余未归类"]],
     )
     _write_edge(
-        out / "被删旧专业.xlsx",
+        out / "往年有但今年停招的专业.xlsx",
         ["学校", "招生类别", "专业", "近三年统计线差", "近三年线差标准差", "日志"],
         [["他大学", "", "旧专业", 40.0, 3.0, "近三年有、2026 大绿本无"]],
     )
@@ -113,12 +200,12 @@ def _good_output_dir(tmp_path: Path) -> Path:
         [["新校", "旧校", 0.9, 5, "前身旧校", False]],
     )
     _write_edge(
-        out / "新增校表.xlsx",
+        out / "今年新招生的学校.xlsx",
         ["2026新校名", "2026本科专业数", "日志"],
         [["全新校", 3, "2026 新增校，近三年无招生"]],
     )
     _write_edge(
-        out / "停招消失校表.xlsx",
+        out / "往年有今年停招的学校.xlsx",
         ["历史旧校名", "日志"],
         [["消失校", "学校未在 2026 招生"]],
     )
@@ -149,16 +236,78 @@ def _good_data_dir(tmp_path: Path) -> Path:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "统计结果"
-    ws.append(["批次", "校码", "校名", "专业名", "选科", "备注",
-               "基础专业", "是否括号", "括号", "统计线差",
-               "2023", "2024", "2025", "", "", "", "年数",
-               "", "", "线差标准差"])
-    ws.append(["常规批一段线", "A01", "示例大学", "计算机", "物理", "",
-               "计算机", "否", "", 60.0, 60.0, 60.0, 60.0,
-               "", "", "", 3, "", "", 5.0])
-    ws.append(["常规批一段线", "A01", "示例大学", "数学", "物理", "",
-               "数学", "否", "", 70.0, 70.0, 70.0, 70.0,
-               "", "", "", 3, "", "", None])
+    ws.append(
+        [
+            "批次",
+            "校码",
+            "校名",
+            "专业名",
+            "选科",
+            "备注",
+            "基础专业",
+            "是否括号",
+            "括号",
+            "统计线差",
+            "2023",
+            "2024",
+            "2025",
+            "",
+            "",
+            "",
+            "年数",
+            "",
+            "",
+            "线差标准差",
+        ]
+    )
+    ws.append(
+        [
+            "常规批一段线",
+            "A01",
+            "示例大学",
+            "计算机",
+            "物理",
+            "",
+            "计算机",
+            "否",
+            "",
+            60.0,
+            60.0,
+            60.0,
+            60.0,
+            "",
+            "",
+            "",
+            3,
+            "",
+            "",
+            5.0,
+        ]
+    )
+    ws.append(
+        [
+            "常规批一段线",
+            "A01",
+            "示例大学",
+            "数学",
+            "物理",
+            "",
+            "数学",
+            "否",
+            "",
+            70.0,
+            70.0,
+            70.0,
+            70.0,
+            "",
+            "",
+            "",
+            3,
+            "",
+            "",
+            None,
+        ]
+    )
     wb.save(data / "近三年学校批次专业线差统计.xlsx")
     wb.close()
     return data
@@ -174,8 +323,11 @@ def test_audit_passes_on_good_output(tmp_path: Path) -> None:
     inter = _good_intermediate_dir(tmp_path)
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert isinstance(report, AuditReport)
     assert report.ok is True, report.checks
@@ -190,8 +342,11 @@ def test_check0_fails_when_judgmental_row_not_in_verify(tmp_path: Path) -> None:
     inter = _good_intermediate_dir(tmp_path)
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c0 = next(c for c in report.checks if c["name"].startswith("judgmental_coverage"))
@@ -208,8 +363,11 @@ def test_check0_fails_when_verify_jsonl_missing(tmp_path: Path) -> None:
     inter = _good_intermediate_dir(tmp_path)
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c0 = next(c for c in report.checks if c["name"].startswith("judgmental_coverage"))
@@ -229,8 +387,11 @@ def test_check0_does_not_treat_semantic_null_as_judgmental(tmp_path: Path) -> No
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     c0 = next(c for c in report.checks if c["name"].startswith("judgmental_coverage"))
     assert c0["passed"] is True, c0
@@ -246,18 +407,21 @@ def test_check1_fails_on_blank_stage(tmp_path: Path) -> None:
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     # Corrupt the flat output: blank 匹配方式 on the first major row.
-    wb = openpyxl.load_workbook(out / "大绿本_附线差_扁平版.xlsx")
+    wb = openpyxl.load_workbook(out / "大绿本_专业列表_含线差.xlsx")
     ws = wb.active
     # Find the 匹配方式 column by name (not index).
     header = [c.value for c in ws[1]]
     stage_col = header.index("匹配方式") + 1
     ws.cell(row=2, column=stage_col).value = None
-    wb.save(out / "大绿本_附线差_扁平版.xlsx")
+    wb.save(out / "大绿本_专业列表_含线差.xlsx")
     wb.close()
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c1 = next(c for c in report.checks if c["name"].startswith("nonempty_log"))
@@ -272,15 +436,18 @@ def test_check2_fails_on_empty_row(tmp_path: Path) -> None:
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
-    wb = openpyxl.load_workbook(out / "特殊情况.xlsx")
+    wb = openpyxl.load_workbook(out / "未能匹配的专业.xlsx")
     ws = wb.active
     ws.append([None, None, None, None, None, None, None, None])
-    wb.save(out / "特殊情况.xlsx")
+    wb.save(out / "未能匹配的专业.xlsx")
     wb.close()
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c2 = next(c for c in report.checks if c["name"].startswith("no_empty_rows"))
@@ -296,15 +463,26 @@ def test_check3_fails_when_table_has_no_data_rows(tmp_path: Path) -> None:
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     _write_edge(
-        out / "新增专业.xlsx",
-        ["学校", "专业", "选科", "统计线差估算", "线差标准差估算",
-         "退化级别", "样本量", "日志"],
+        out / "今年新增往年没有的专业.xlsx",
+        [
+            "学校",
+            "专业",
+            "选科",
+            "统计线差估算",
+            "线差标准差估算",
+            "退化级别",
+            "样本量",
+            "日志",
+        ],
         [],
     )
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c3 = next(c for c in report.checks if c["name"].startswith("tables_nonempty"))
@@ -324,15 +502,18 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
         {"school": "示例大学", "major": "数学", "J": 70.0, "T": None},
     ]
     # Corrupt the strict row's J (匹配方式=严格匹配 → matched).
-    wb = openpyxl.load_workbook(out / "大绿本_附线差_分层版.xlsx")
+    wb = openpyxl.load_workbook(out / "大绿本_完整版_含线差.xlsx")
     ws = wb.active
     ws.cell(row=2, column=13).value = 999.0
-    wb.save(out / "大绿本_附线差_分层版.xlsx")
+    wb.save(out / "大绿本_完整版_含线差.xlsx")
     wb.close()
 
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=history, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=history,
+        semantic_dir=sem,
     )
     assert report.ok is False
     c4 = next(c for c in report.checks if c["name"].startswith("jt_consistency"))
@@ -340,7 +521,7 @@ def test_check4_fails_on_jt_mismatch(tmp_path: Path) -> None:
 
 
 def test_check4_estimate_row_uses_round_tolerance(tmp_path: Path) -> None:
-    """新增专业 rows (匹配方式=新增专业) compared against 新增专业.xlsx."""
+    """新增专业 rows (匹配方式=新增专业) compared against 今年新增往年没有的专业.xlsx."""
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
@@ -350,8 +531,11 @@ def test_check4_estimate_row_uses_round_tolerance(tmp_path: Path) -> None:
         {"school": "示例大学", "major": "数学", "J": 70.0, "T": None},
     ]
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=history, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=history,
+        semantic_dir=sem,
     )
     c4 = next(c for c in report.checks if c["name"].startswith("jt_consistency"))
     assert c4["passed"] is True, c4
@@ -366,8 +550,11 @@ def test_audit_report_structure(tmp_path: Path) -> None:
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     report = audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     assert hasattr(report, "ok")
     assert hasattr(report, "checks")
@@ -383,8 +570,11 @@ def test_audit_writes_sample_xlsx(tmp_path: Path) -> None:
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     audit(
-        out, data_dir=data, intermediate_dir=inter,
-        history=None, semantic_dir=sem,
+        out,
+        data_dir=data,
+        intermediate_dir=inter,
+        history=None,
+        semantic_dir=sem,
     )
     sample = out / "audit_sample.xlsx"
     assert sample.exists()
@@ -398,37 +588,55 @@ def test_audit_writes_sample_xlsx(tmp_path: Path) -> None:
 # --- main() exit code contract ---------------------------------------------
 
 
-def test_main_exits_zero_on_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_exits_zero_on_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     out = _good_output_dir(tmp_path)
     sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     monkeypatch.setattr(
-        sys, "argv",
-        ["audit_output",
-         "--output-dir", str(out),
-         "--data-dir", str(data),
-         "--intermediate-dir", str(inter),
-         "--semantic-dir", str(sem)],
+        sys,
+        "argv",
+        [
+            "audit_output",
+            "--output-dir",
+            str(out),
+            "--data-dir",
+            str(data),
+            "--intermediate-dir",
+            str(inter),
+            "--semantic-dir",
+            str(sem),
+        ],
     )
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0
 
 
-def test_main_exits_nonzero_on_fail(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_exits_nonzero_on_fail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     out = _good_output_dir(tmp_path)
     sem = tmp_path / "semantic-match"
     sem.mkdir()
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     monkeypatch.setattr(
-        sys, "argv",
-        ["audit_output",
-         "--output-dir", str(out),
-         "--data-dir", str(data),
-         "--intermediate-dir", str(inter),
-         "--semantic-dir", str(sem)],
+        sys,
+        "argv",
+        [
+            "audit_output",
+            "--output-dir",
+            str(out),
+            "--data-dir",
+            str(data),
+            "--intermediate-dir",
+            str(inter),
+            "--semantic-dir",
+            str(sem),
+        ],
     )
     with pytest.raises(SystemExit) as exc:
         main()
@@ -441,11 +649,20 @@ def test_main_cli_subprocess_zero(tmp_path: Path) -> None:
     data = _good_data_dir(tmp_path)
     inter = _good_intermediate_dir(tmp_path)
     proc = subprocess.run(
-        [sys.executable, "-m", "scripts.audit_output",
-         "--output-dir", str(out),
-         "--data-dir", str(data),
-         "--intermediate-dir", str(inter),
-         "--semantic-dir", str(sem)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "scripts.audit_output",
+            "--output-dir",
+            str(out),
+            "--data-dir",
+            str(data),
+            "--intermediate-dir",
+            str(inter),
+            "--semantic-dir",
+            str(sem),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr

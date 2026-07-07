@@ -57,14 +57,14 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # Produced-file names (mirror write_outputs / write_edge_tables).
-HIER_ARCHICAL_NAME = "大绿本_附线差_分层版.xlsx"
-FLAT_NAME = "大绿本_附线差_扁平版.xlsx"
-NEW_MAJOR_NAME = "新增专业.xlsx"
-SPECIAL_NAME = "特殊情况.xlsx"
-DELETED_NAME = "被删旧专业.xlsx"
+HIER_ARCHICAL_NAME = "大绿本_完整版_含线差.xlsx"
+FLAT_NAME = "大绿本_专业列表_含线差.xlsx"
+NEW_MAJOR_NAME = "今年新增往年没有的专业.xlsx"
+SPECIAL_NAME = "未能匹配的专业.xlsx"
+DELETED_NAME = "往年有但今年停招的专业.xlsx"
 RENAME_NAME = "学校改名表.xlsx"
-NEW_SCHOOL_NAME = "新增校表.xlsx"
-GONE_SCHOOL_NAME = "停招消失校表.xlsx"
+NEW_SCHOOL_NAME = "今年新招生的学校.xlsx"
+GONE_SCHOOL_NAME = "往年有今年停招的学校.xlsx"
 
 # Every produced table the audit must consider for the empty-row / nonempty
 # checks. Order is stable for readable reports.
@@ -210,7 +210,8 @@ def _check0_judgmental_coverage(
     name = "judgmental_coverage"
     if verdicts is None:
         return {
-            "name": name, "passed": False,
+            "name": name,
+            "passed": False,
             "detail": "复核未派发：semantic-match/verify_*_result.jsonl 缺失",
         }
 
@@ -244,7 +245,11 @@ def _check0_judgmental_coverage(
             f"示例缺 idx={missing[:5]}，verdict≠确定 idx={wrong_verdict[:5]}"
         )
         return {"name": name, "passed": False, "detail": detail}
-    return {"name": name, "passed": True, "detail": "判断型匹配复核覆盖完备（verdict=确定）"}
+    return {
+        "name": name,
+        "passed": True,
+        "detail": "判断型匹配复核覆盖完备（verdict=确定）",
+    }
 
 
 def _check1_nonempty_stage(flat_rows: list[tuple]) -> AuditCheck:
@@ -266,7 +271,8 @@ def _check1_nonempty_stage(flat_rows: list[tuple]) -> AuditCheck:
             blank.append(row_idx_0 + 1)
     if blank:
         return {
-            "name": name, "passed": False,
+            "name": name,
+            "passed": False,
             "detail": f"扁平版 {len(blank)} 行匹配阶段为空；示例行={blank[:5]}",
         }
     return {"name": name, "passed": True, "detail": "本科专业行匹配阶段全部非空"}
@@ -289,7 +295,8 @@ def _check2_no_empty_rows(out_dir: Path) -> AuditCheck:
                 break  # one offender per table is enough
     if offenders:
         return {
-            "name": name, "passed": False,
+            "name": name,
+            "passed": False,
             "detail": f"{len(offenders)} 张表含全空数据行：{offenders[:5]}",
         }
     return {"name": name, "passed": True, "detail": "所有产出表无全空数据行"}
@@ -310,7 +317,8 @@ def _check3_tables_nonempty(out_dir: Path) -> AuditCheck:
             empty_tables.append(fname)
     if empty_tables:
         return {
-            "name": name, "passed": False,
+            "name": name,
+            "passed": False,
             "detail": f"{len(empty_tables)} 张表无数据行：{empty_tables}",
         }
     return {"name": name, "passed": True, "detail": "所有产出表均含至少 1 行数据"}
@@ -329,7 +337,7 @@ def _check4_jt_consistency(
     (handles float display drift; single-year T=None must match None).
 
     新增估算 rows (匹配阶段 == 新增专业) are compared against the value in
-    ``新增专业.xlsx`` at (school, major) — the estimate table is the ground
+    ``今年新增往年没有的专业.xlsx`` at (school, major) — the estimate table is the ground
     truth for new-major rows (V5-6 precision split).
     """
     name = "jt_consistency"
@@ -416,14 +424,16 @@ def _check4_jt_consistency(
 
     if mismatches:
         return {
-            "name": name, "passed": False,
+            "name": name,
+            "passed": False,
             "detail": (
                 f"J/T 不一致 {len(mismatches)} 处（抽样 matched={len(sample_matched)}, "
                 f"estimate={len(sample_estimate)}）：{mismatches[:5]}"
             ),
         }
     return {
-        "name": name, "passed": True,
+        "name": name,
+        "passed": True,
         "detail": (
             f"抽样 {len(sample_matched)} matched + {len(sample_estimate)} estimate 行 "
             f"J/T 与源值一致（容差 {JT_TOLERANCE}）"
@@ -492,8 +502,10 @@ def audit(
     """
     out_dir = Path(output_dir)
     data_dir = Path(data_dir)
-    sem_dir = Path(semantic_dir) if semantic_dir is not None else (
-        out_dir.parent / "semantic-match"
+    sem_dir = (
+        Path(semantic_dir)
+        if semantic_dir is not None
+        else (out_dir.parent / "semantic-match")
     )
 
     hier_path = out_dir / HIER_ARCHICAL_NAME
@@ -515,7 +527,9 @@ def audit(
         try:
             hist = _rebuild_history(data_dir)
         except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("audit: history 重建失败 (%s)；check4 将跳过 matched 比对", exc)
+            logger.warning(
+                "audit: history 重建失败 (%s)；check4 将跳过 matched 比对", exc
+            )
             hist = []
     new_major_rows: list[tuple] = []
     nm_path = out_dir / NEW_MAJOR_NAME
@@ -570,23 +584,32 @@ def main() -> None:
         description="V5-3 data-quality audit hard gate over real produced xlsx.",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("output"),
+        "--output-dir",
+        type=Path,
+        default=Path("output"),
         help="Directory holding the produced xlsx (default: output)",
     )
     parser.add_argument(
-        "--data-dir", type=Path, default=Path("data"),
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
         help="Directory holding the three source xlsx (default: data)",
     )
     parser.add_argument(
-        "--intermediate-dir", type=Path, default=Path("intermediate"),
+        "--intermediate-dir",
+        type=Path,
+        default=Path("intermediate"),
         help="Intermediate-artefact directory (default: intermediate)",
     )
     parser.add_argument(
-        "--semantic-dir", type=Path, default=Path("semantic-match"),
+        "--semantic-dir",
+        type=Path,
+        default=Path("semantic-match"),
         help="Directory holding verify_*_result.jsonl (default: semantic-match)",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     args = parser.parse_args()

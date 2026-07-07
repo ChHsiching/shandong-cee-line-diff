@@ -41,6 +41,7 @@ def _tq_pairs(rows: Iterable[Sequence]) -> list[tuple[str, str]]:
 
 # --- pure function: pair extraction ----------------------------------------
 
+
 def test_extract_j3_early_pairs_filters_only_early_batch():
     rows = [
         ("批次", "code", "school", "major", "subject"),
@@ -75,6 +76,7 @@ def test_extract_pairs_applies_nfk_to_majorname():
 
 # --- core contract: overlap report ----------------------------------------
 
+
 def test_report_overlap_when_j3_subset_of_tq_returns_zero_unique():
     j3_pairs = [("B002", "数学"), ("B003", "英语")]
     tq_pairs = [("B002", "数学"), ("B003", "英语"), ("B004", "物理")]
@@ -95,7 +97,8 @@ def test_report_overlap_dedupes_repeated_j3_keys():
     """A school may list the same major in multiple近三年 rows; the unique-key
     set must collapse duplicates so the reported count is the de-duplicated size."""
     j3_pairs = [
-        ("B002", "数学"), ("B002", "数学"),  # duplicate
+        ("B002", "数学"),
+        ("B002", "数学"),  # duplicate
         ("B999", "护理"),
     ]
     tq_pairs = [("B002", "数学")]
@@ -105,6 +108,7 @@ def test_report_overlap_dedupes_repeated_j3_keys():
 
 
 # --- csv writer for human review ------------------------------------------
+
 
 def test_write_unique_csv_reports_correct_row_count(tmp_path: Path):
     j3_pairs = [("B002", "数学"), ("B999", "护理")]
@@ -132,6 +136,7 @@ def test_write_unique_csv_with_zero_rows_still_writes_header(tmp_path: Path):
 
 # --- real-workbook smoke (contract: not hard FAIL) ------------------------
 
+
 class TestVerify825Smoke:
     """Smoke: real workbooks. Per Plan v2 this is a **契约测试 (不硬 FAIL)** —
     the contract is `reported_count == len(csv 独有行)`, surfaced for human
@@ -142,13 +147,15 @@ class TestVerify825Smoke:
 
         wb_j3 = openpyxl.load_workbook(
             repo_root / "data" / "近三年学校批次专业线差统计.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows_j3 = list(wb_j3["统计结果"].iter_rows(values_only=True))
         wb_j3.close()
         wb_tq = openpyxl.load_workbook(
             repo_root / "data" / "山东省高考提前批录取数据.xlsx",
-            read_only=True, data_only=True,
+            read_only=True,
+            data_only=True,
         )
         rows_tq = list(wb_tq[wb_tq.sheetnames[0]].iter_rows(values_only=True))
         wb_tq.close()

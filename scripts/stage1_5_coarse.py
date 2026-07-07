@@ -31,7 +31,6 @@ from typing import Iterable
 
 from scripts.constants import (
     LOG_COARSE_CANDIDATE,
-    LOG_COARSE_CANDIDATE,
     LOG_SUBJECT_NOTE,
 )
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
@@ -115,15 +114,11 @@ def _subject_differs(dl_subject: str, hist_subject: str) -> bool:
     return a != b
 
 
-def _accept(
-    dagluben: DaglubenRow, candidate: HistoryRow, base_log: str
-) -> MatchResult:
+def _accept(dagluben: DaglubenRow, candidate: HistoryRow, base_log: str) -> MatchResult:
     """Build an accepted MatchResult, appending the选科 drift note and the
     single-year-T note if applicable."""
     log = base_log
-    if _subject_differs(
-        dagluben.get("subject", ""), candidate.get("subject", "")
-    ):
+    if _subject_differs(dagluben.get("subject", ""), candidate.get("subject", "")):
         log = f"{log}；{LOG_SUBJECT_NOTE}"
     note = single_year_note(candidate)
     if note:

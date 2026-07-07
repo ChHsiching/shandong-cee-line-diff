@@ -54,6 +54,4 @@ def load_source(path: str | Path, *, read_only: bool = True) -> Workbook:
     cells, which is what we want for the line-diff statistics already stored
     in 近三年. The caller is responsible for closing the workbook.
     """
-    return openpyxl.load_workbook(
-        Path(path), read_only=read_only, data_only=True
-    )
+    return openpyxl.load_workbook(Path(path), read_only=read_only, data_only=True)

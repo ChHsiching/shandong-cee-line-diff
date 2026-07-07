@@ -335,8 +335,8 @@ def test_hierarchical_and_flat_are_same_source(fixture_workbooks, tmp_path):
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     run(data_dir, out_dir, with_agent_results=False)
 
-    hier_path = out_dir / "大绿本_附线差_分层版.xlsx"
-    flat_path = out_dir / "大绿本_附线差_扁平版.xlsx"
+    hier_path = out_dir / "大绿本_完整版_含线差.xlsx"
+    flat_path = out_dir / "大绿本_专业列表_含线差.xlsx"
     assert hier_path.exists()
     assert flat_path.exists()
 

@@ -140,7 +140,9 @@ def test_reject_duplicate_src_row_idx_across_files(tmp_path: Path) -> None:
     # Both lines echo the real candidate J/T so we reach the dedupe gate
     # rather than tripping the J/T echo contract first.
     j1.write_text(_line(1, "计算机类", "第一次", 80.0, 1.0) + "\n", encoding="utf-8")
-    j2.write_text(_line(1, "计算机类(网络)", "第二次", 78.0, 1.0) + "\n", encoding="utf-8")
+    j2.write_text(
+        _line(1, "计算机类(网络)", "第二次", 78.0, 1.0) + "\n", encoding="utf-8"
+    )
     with pytest.raises(Stage2ContractError) as exc:
         apply_results([j1, j2], dagluben, history)
     assert "重复" in str(exc.value) or "duplicate" in str(exc.value).lower()
@@ -274,7 +276,9 @@ def test_reason_over_30_chars_is_trimmed_not_rejected(tmp_path: Path) -> None:
     dagluben = [_dl(1, "甲大学", "计算机类(图灵)", "计算机类")]
     dagluben[0]["subject"] = "物理"  # matches history _hist subject
     history = list(_fixtures()[1])
-    long_reason = "核心名完全一致且方向括号完美对齐无任何歧义可放心匹配成功" * 2  # >30 chars
+    long_reason = (
+        "核心名完全一致且方向括号完美对齐无任何歧义可放心匹配成功" * 2
+    )  # >30 chars
     assert len(long_reason) > 30
     jsonl = _write(tmp_path, [_line(1, "计算机类", long_reason, 80.0, 1.0)])
     results = apply_results([jsonl], dagluben, history)
@@ -282,7 +286,7 @@ def test_reason_over_30_chars_is_trimmed_not_rejected(tmp_path: Path) -> None:
     # log = agent 语义匹配：<trimmed reason>. No选科 drift here (subjects match).
     assert results[0]["log"].startswith("agent 语义匹配：")
     assert "选科要求跨年不同" not in results[0]["log"]
-    reason_portion = results[0]["log"][len("agent 语义匹配："):]
+    reason_portion = results[0]["log"][len("agent 语义匹配：") :]
     assert len(reason_portion) <= 30
     assert len(reason_portion) < len(long_reason)  # was actually trimmed
 
@@ -291,10 +295,7 @@ def test_blank_lines_in_jsonl_are_skipped(tmp_path: Path) -> None:
     dagluben, history = _fixtures()
     jsonl = tmp_path / "batch_01_result.jsonl"
     jsonl.write_text(
-        "\n"
-        + _line(1, "计算机类", "核心名同", 80.0, 1.0)
-        + "\n\n"
-        + "   \n",
+        "\n" + _line(1, "计算机类", "核心名同", 80.0, 1.0) + "\n\n" + "   \n",
         encoding="utf-8",
     )
     results = apply_results([jsonl], dagluben, history)
@@ -393,15 +394,25 @@ def test_apply_results_single_year_history_adds_no_stddev_note(tmp_path: Path) -
     dagluben = [_dl(1, "甲大学", "计算机类(图灵)", "计算机类")]
     history = [
         HistoryRow(
-            school="甲大学", school_cat="", major="计算机类(网络)",
-            stripped="计算机类(网络)", core="计算机类", subject="物理",
-            J=78.0, T=None, source_table="常规批一段线",
+            school="甲大学",
+            school_cat="",
+            major="计算机类(网络)",
+            stripped="计算机类(网络)",
+            core="计算机类",
+            subject="物理",
+            J=78.0,
+            T=None,
+            source_table="常规批一段线",
         ),
     ]
     line = json.dumps(
         {
-            "src_row_idx": 1, "school": "甲大学", "major": "计算机类(图灵)",
-            "match": "计算机类(网络)", "J": 78.0, "T": None,
+            "src_row_idx": 1,
+            "school": "甲大学",
+            "major": "计算机类(图灵)",
+            "match": "计算机类(网络)",
+            "J": 78.0,
+            "T": None,
             "reason": "方向对齐",
         },
         ensure_ascii=False,

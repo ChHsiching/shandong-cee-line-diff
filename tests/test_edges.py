@@ -19,7 +19,12 @@ from __future__ import annotations
 
 from scripts.constants import FLIGHT_BATCH
 from scripts.models import DaglubenRow, HistoryRow
-from scripts.stage3_edges import DeletedMajor, EdgeRow, deleted_majors, flight_and_special
+from scripts.stage3_edges import (
+    DeletedMajor,
+    EdgeRow,
+    deleted_majors,
+    flight_and_special,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -64,8 +69,8 @@ def test_deleted_majors_excludes_renamed_schools() -> None:
     # 改名后该校在 2026 用「新校名」招生；若不排除，旧校名下的历史专业会
     # 被误判为「近三年有、2026 缺」。
     history = [
-        HistoryRow(school="旧大学", major="甲专业", J=80.0),   # 旧名 = 历史独有校
-        HistoryRow(school="新大学", major="乙专业", J=70.0),   # 新名 = 大绿本独有校
+        HistoryRow(school="旧大学", major="甲专业", J=80.0),  # 旧名 = 历史独有校
+        HistoryRow(school="新大学", major="乙专业", J=70.0),  # 新名 = 大绿本独有校
     ]
     # 「新大学」在 2026 存在；「旧大学」不在（改名消失）。
     dgl_present = {"新大学"}
@@ -101,15 +106,18 @@ def test_deleted_majors_empty_history_returns_empty() -> None:
 def test_flight_rows_unmatched_become_special() -> None:
     # 飞行技术(军队) 2 行：batch=FLIGHT_BATCH，归提前批池匹配不成 → 特殊。
     flight_unmatched = [
-        DaglubenRow(school="空军航空大学", major="飞行技术",
-                    batch=FLIGHT_BATCH, src_row_idx=101),
-        DaglubenRow(school="海军航空大学", major="飞行技术",
-                    batch=FLIGHT_BATCH, src_row_idx=102),
+        DaglubenRow(
+            school="空军航空大学", major="飞行技术", batch=FLIGHT_BATCH, src_row_idx=101
+        ),
+        DaglubenRow(
+            school="海军航空大学", major="飞行技术", batch=FLIGHT_BATCH, src_row_idx=102
+        ),
     ]
     # 其它无法匹配的大绿本专业（剩余 unmatched 残留）。
     other_unmatched = [
-        DaglubenRow(school="某大学", major="奇怪专业",
-                    batch="4.常规批", src_row_idx=200),
+        DaglubenRow(
+            school="某大学", major="奇怪专业", batch="4.常规批", src_row_idx=200
+        ),
     ]
 
     special = flight_and_special(flight_unmatched, other_unmatched)
@@ -135,8 +143,14 @@ def test_flight_and_special_empty_inputs_returns_empty() -> None:
 
 def test_flight_and_special_preserves_dagluben_fields() -> None:
     flight = [
-        DaglubenRow(school="空军航空大学", major="飞行技术", core="飞行技术",
-                    subject="物理", batch=FLIGHT_BATCH, src_row_idx=7),
+        DaglubenRow(
+            school="空军航空大学",
+            major="飞行技术",
+            core="飞行技术",
+            subject="物理",
+            batch=FLIGHT_BATCH,
+            src_row_idx=7,
+        ),
     ]
     special = flight_and_special(flight, [])
     assert len(special) == 1
@@ -149,10 +163,17 @@ def test_flight_and_special_preserves_dagluben_fields() -> None:
 
 def test_deletedmajor_is_edgerow_subschema() -> None:
     # DeletedMajor 与 EdgeRow 共享关键字段（school/major/src_row_idx/log）。
-    dm = DeletedMajor(school="甲大学", major="乙专业", J=80.0, T=1.0,
-                      school_cat="", log="近三年有、2026 大绿本无")
-    er = EdgeRow(school="甲大学", major="乙专业", batch="", src_row_idx=0,
-                 log="无法匹配：测试")
+    dm = DeletedMajor(
+        school="甲大学",
+        major="乙专业",
+        J=80.0,
+        T=1.0,
+        school_cat="",
+        log="近三年有、2026 大绿本无",
+    )
+    er = EdgeRow(
+        school="甲大学", major="乙专业", batch="", src_row_idx=0, log="无法匹配：测试"
+    )
     # 二者都有 school / major / log 键。
     for key in ("school", "major", "log"):
         assert key in dm
