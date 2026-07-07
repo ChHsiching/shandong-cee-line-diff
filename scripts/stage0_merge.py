@@ -138,13 +138,20 @@ TQ_MAJORNAME = 5  # 专业名称 (F 列)
 TQ_SUBJECT = 6  # 选科 (G 列)
 
 
-def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
+def build_history_early(
+    rows: Iterable[Sequence],
+    one_line: dict[int, int] | None = None,
+    batches: frozenset[str] | None = None,
+    low_cols: dict[int, int] | None = None,
+) -> list[HistoryRow]:
     """Build the提前批 history pool from the supplement table.
 
     Keeps本科提前批 A类 + B类 (spec §3: AB 无差别, 合并), drops专科提前批
     (193 rows). J/T are computed on the fly from per-year 录取低分
     (2025→idx10, 2024→idx14, 2023→idx18) minus the one-line cutoff
-    (constants.ONE_LINE) via :func:`line_diff.compute`.
+    via :func:`line_diff.compute`.
+
+    ``one_line`` 覆盖 constants.ONE_LINE（参数化，不写死年份/分数）。
 
     The招生类别 comes from column B (supplement-table semantics), which differs
     from 近三年 where it is split off the校名 bracket; the supplement table
@@ -152,7 +159,9 @@ def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
     into the same ``school_cat`` field so the strict matcher can key on it
     uniformly.
     """
-    early_batches: frozenset[str] = frozenset({TQ_BATCH_EARLY_A, TQ_BATCH_EARLY_B})
+    cutoff = one_line or ONE_LINE
+    early_batches = batches or frozenset({TQ_BATCH_EARLY_A, TQ_BATCH_EARLY_B})
+    cols = low_cols or {2025: TQ_LOW_2025, 2024: TQ_LOW_2024, 2023: TQ_LOW_2023}
     out: list[HistoryRow] = []
     for row in rows:
         if _is_header(row):
@@ -171,12 +180,8 @@ def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
         core = nfk(core_of(major_raw))
         subject = nfk(_cell(row, TQ_SUBJECT) or "")
 
-        lows = {
-            2025: _to_float(_cell(row, TQ_LOW_2025)),
-            2024: _to_float(_cell(row, TQ_LOW_2024)),
-            2023: _to_float(_cell(row, TQ_LOW_2023)),
-        }
-        j, t = compute_line_diff(lows, ONE_LINE)
+        lows = {y: _to_float(_cell(row, c)) for y, c in cols.items()}
+        j, t = compute_line_diff(lows, cutoff)
 
         out.append(
             HistoryRow(
@@ -197,6 +202,9 @@ def build_history_early(rows: Iterable[Sequence]) -> list[HistoryRow]:
 def build_unified_history(
     j3_rows: Iterable[Sequence],
     tq_rows: Iterable[Sequence],
+    one_line: dict[int, int] | None = None,
+    batches: frozenset[str] | None = None,
+    low_cols: dict[int, int] | None = None,
 ) -> list[HistoryRow]:
     """Concatenate常规批一段 + 提前批 into the unified history pool (spec §4.1).
 
@@ -205,7 +213,9 @@ def build_unified_history(
     larger, pre-computed regular pool as the canonical side.
     """
     regular = build_history_regular(j3_rows)
-    early = build_history_early(tq_rows)
+    early = build_history_early(
+        tq_rows, one_line=one_line, batches=batches, low_cols=low_cols
+    )
     return [*regular, *early]
 
 

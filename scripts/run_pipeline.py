@@ -101,13 +101,17 @@ def _load_rows(path: Path, sheet_name: str | None = None):
         wb.close()
 
 
-def _guard_sources(data_dir: Path) -> dict[str, str]:
+def _guard_sources(
+    data_dir: Path, source_files: dict[str, str] | None = None
+) -> dict[str, str]:
     """Hash every source before the run; return the baseline map.
 
     可选源（SOURCE_OPTIONAL）不存在时跳过，不强求（如提前批补充表）。
+    source_files 覆盖 SOURCE_FILES（CLI 参数化文件名）。
     """
+    files = source_files or SOURCE_FILES
     hashes: dict[str, str] = {}
-    for key, name in SOURCE_FILES.items():
+    for key, name in files.items():
         p = data_dir / name
         if key in SOURCE_OPTIONAL and not p.exists():
             continue
@@ -364,6 +368,10 @@ def run(
     with_agent_results: bool = False,
     semantic_dir: str | Path | None = None,
     intermediate_dir: str | Path | None = None,
+    source_files: dict[str, str] | None = None,
+    one_line: dict[int, int] | None = None,
+    supplement_batches: frozenset[str] | None = None,
+    supplement_low_cols: dict[int, int] | None = None,
 ) -> PipelineReport:
     """Run the deterministic admission-data pipeline end-to-end.
 
@@ -406,15 +414,22 @@ def run(
     intermediate_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Source immutability guard (before) ---------------------------------
-    source_hashes = _guard_sources(data_dir)
+    files = source_files or SOURCE_FILES
+    source_hashes = _guard_sources(data_dir, files)
 
     # --- Stage 0 ------------------------------------------------------------
-    j3_rows = _load_rows(data_dir / SOURCE_FILES["j3"], J3_SHEET)
-    tq_path = data_dir / SOURCE_FILES["tq"]
+    j3_rows = _load_rows(data_dir / files["j3"], J3_SHEET)
+    tq_path = data_dir / files["tq"]
     tq_rows = _load_rows(tq_path) if tq_path.exists() else []
-    dl_rows = _load_rows(data_dir / SOURCE_FILES["dl"])
+    dl_rows = _load_rows(data_dir / files["dl"])
 
-    history = build_unified_history(j3_rows, tq_rows)
+    history = build_unified_history(
+        j3_rows,
+        tq_rows,
+        one_line=one_line,
+        batches=supplement_batches,
+        low_cols=supplement_low_cols,
+    )
     dagluben = [
         *build_dagluben_regular(dl_rows),
         *build_dagluben_early(dl_rows),
@@ -643,7 +658,7 @@ def run(
         new_major_estimates,
         classified_idx=classified_for_main,
     )
-    dl_path = data_dir / SOURCE_FILES["dl"]
+    dl_path = data_dir / files["dl"]
     write_hierarchical(
         dl_path,
         main_results,
@@ -750,7 +765,59 @@ def main() -> None:
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
+    parser.add_argument("--dl-file", default=None, help="大绿本文件名（覆盖默认）")
+    parser.add_argument(
+        "--j3-file", default=None, help="近三年统计表文件名（覆盖默认）"
+    )
+    parser.add_argument(
+        "--tq-file",
+        default=None,
+        help="提前批补充表文件名（覆盖默认；不存在则跳过）",
+    )
+    parser.add_argument(
+        "--one-line",
+        default=None,
+        help="一段线，格式「2025=443,2024=444,2023=441」（覆盖默认）",
+    )
+    parser.add_argument(
+        "--supplement-batches",
+        default=None,
+        help="补充表批次名，逗号分隔（如 本科提前批A类,本科提前批B类）",
+    )
+    parser.add_argument(
+        "--supplement-low-cols",
+        default=None,
+        help="补充表低分列，格式「2025=10,2024=14,2023=18」（0 开始数）",
+    )
     args = parser.parse_args()
+
+    # CLI 参数化：文件名 + 一段线（覆盖模块默认，agent 传参不手写代码）。
+    source_files = None
+    if args.dl_file or args.j3_file or args.tq_file:
+        source_files = dict(SOURCE_FILES)
+        if args.dl_file:
+            source_files["dl"] = args.dl_file
+        if args.j3_file:
+            source_files["j3"] = args.j3_file
+        if args.tq_file:
+            source_files["tq"] = args.tq_file
+    one_line = None
+    if args.one_line:
+        one_line = {}
+        for pair in args.one_line.split(","):
+            year, val = pair.split("=")
+            one_line[int(year)] = int(val)
+    supplement_batches = (
+        frozenset(args.supplement_batches.split(","))
+        if args.supplement_batches
+        else None
+    )
+    supplement_low_cols = None
+    if args.supplement_low_cols:
+        supplement_low_cols = {}
+        for pair in args.supplement_low_cols.split(","):
+            year, col = pair.split("=")
+            supplement_low_cols[int(year)] = int(col)
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -763,6 +830,10 @@ def main() -> None:
         with_agent_results=args.with_agent_results,
         semantic_dir=args.semantic_dir,
         intermediate_dir=args.intermediate_dir,
+        source_files=source_files,
+        one_line=one_line,
+        supplement_batches=supplement_batches,
+        supplement_low_cols=supplement_low_cols,
     )
 
     cov = report["coverage"]

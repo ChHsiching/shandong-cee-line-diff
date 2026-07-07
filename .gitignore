@@ -44,3 +44,4 @@ research/*
 
 # OS / editor
 .DS_Store
+tests/fixtures/real_data/
