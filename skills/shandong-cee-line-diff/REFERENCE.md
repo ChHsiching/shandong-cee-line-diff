@@ -87,6 +87,23 @@ exit 0 才算完成。检查内容：
 | 核心专业名列没有残留括号 | 去括号要干净（含嵌套） |
 | 无法匹配的只剩下往年真的没有同核心专业名的 | 不应该有大类变体混在里面 |
 
+## 管线串联命令
+
+跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）：
+
+1. **第一次跑管线**（写出 agent prompt + 候选，不 apply）：
+   `.venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match`
+2. **派 agent 跑语义匹配**：读 `semantic-match/batch_NN_prompt.json`，每批派 subagent，结果写 `semantic-match/batch_NN_result.jsonl`（每行 `{src_row_idx, school, major, match, J, T, reason}`）。
+3. **派 agent 跑改名配对**：读 `semantic-match/rename_prompt.md` + `rename_candidates.jsonl`，派 subagent 网查每所消失/新增校，结果写 `semantic-match/rename_result.jsonl`（每行 `{new_school, old_school, confidence, is_rename}`）；网查详情写 `research/<校名>.md`。
+4. **第二次跑管线**（apply 语义 + 改名结果，产出 verify prompt）：
+   `.venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
+5. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`，派 subagent，结果写 `semantic-match/verify_batch_NN_result.jsonl`（每行 `{src_row_idx, verdict, reason}`）。
+6. **第三次跑管线**（apply 复核结果，产出最终 8 张表）：
+   `.venv/bin/python -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
+7. **跑审计**：`.venv/bin/python -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
+
+每一步查中间结果用 `python -m scripts.show_table <产出表> [--head N] [--grep 词]`。
+
 ## 故障排查
 
 | 症状 | 怎么处理 |
