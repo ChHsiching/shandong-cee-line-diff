@@ -76,12 +76,15 @@ __all__ = ["run", "main", "SOURCE_FILES", "PipelineReport"]
 
 logger = logging.getLogger(__name__)
 
-# Repository layout — the three source filenames are fixed (spec §2 / CLAUDE.md).
+# Repository layout — the source filenames (spec §2 / CLAUDE.md).
 SOURCE_FILES: dict[str, str] = {
     "j3": "近三年学校批次专业线差统计.xlsx",
     "tq": "山东省高考提前批录取数据.xlsx",
     "dl": "山东省2026年大绿本招生计划.xlsx",
 }
+# 可选源——不一定存在。提前批补充表（tq）只是补 J3 没统计到的提前批专业；
+# J3 已统计的提前批用现成线差。补充表不存在时跳过，不报错（不特化「必须有」）。
+SOURCE_OPTIONAL: frozenset[str] = frozenset({"tq"})
 
 # Typed alias for the structured report returned by :func:`run`. Kept as a
 # plain dict (not TypedDict) because the report is a test/debug surface, not a
@@ -99,10 +102,15 @@ def _load_rows(path: Path, sheet_name: str | None = None):
 
 
 def _guard_sources(data_dir: Path) -> dict[str, str]:
-    """Hash every source before the run; return the baseline map."""
+    """Hash every source before the run; return the baseline map.
+
+    可选源（SOURCE_OPTIONAL）不存在时跳过，不强求（如提前批补充表）。
+    """
     hashes: dict[str, str] = {}
     for key, name in SOURCE_FILES.items():
         p = data_dir / name
+        if key in SOURCE_OPTIONAL and not p.exists():
+            continue
         h = io_source.sha256(p)
         hashes[name] = h
         io_source.assert_unchanged(p, h)
@@ -402,7 +410,8 @@ def run(
 
     # --- Stage 0 ------------------------------------------------------------
     j3_rows = _load_rows(data_dir / SOURCE_FILES["j3"], J3_SHEET)
-    tq_rows = _load_rows(data_dir / SOURCE_FILES["tq"])
+    tq_path = data_dir / SOURCE_FILES["tq"]
+    tq_rows = _load_rows(tq_path) if tq_path.exists() else []
     dl_rows = _load_rows(data_dir / SOURCE_FILES["dl"])
 
     history = build_unified_history(j3_rows, tq_rows)
