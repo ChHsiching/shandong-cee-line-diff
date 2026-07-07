@@ -22,15 +22,27 @@ from scripts.verify_judgment import DEMOTE_LOG_PREFIX, filter_demoted
 
 def _dl(idx: int, school: str, major: str, batch: str = "4.常规批") -> DaglubenRow:
     return DaglubenRow(
-        src_row_idx=idx, school=school, school_cat="", major=major,
-        stripped=major, core=major, subject="物理", batch=batch,
+        src_row_idx=idx,
+        school=school,
+        school_cat="",
+        major=major,
+        stripped=major,
+        core=major,
+        subject="物理",
+        batch=batch,
     )
 
 
 def _match(idx: int, school: str, major: str, log: str, j: float = 80.0) -> MatchResult:
     return MatchResult(
-        src_row_idx=idx, school=school, school_cat="", major=major,
-        matched=True, J=j, T=1.0, log=log,
+        src_row_idx=idx,
+        school=school,
+        school_cat="",
+        major=major,
+        matched=True,
+        J=j,
+        T=1.0,
+        log=log,
     )
 
 
@@ -50,7 +62,10 @@ def test_filter_demoted_removes_uncertain_from_coarse_and_classified() -> None:
     verdict_by_idx = {1: "存疑", 2: "确定"}
 
     out_coarse, out_classified, demoted_map = filter_demoted(
-        coarse, classified, verdict_by_idx, reasons_by_idx={1: "方向不同"},
+        coarse,
+        classified,
+        verdict_by_idx,
+        reasons_by_idx={1: "方向不同"},
     )
     assert [r["src_row_idx"] for r in out_coarse] == [2]  # idx 1 removed
     assert 1 not in out_classified
@@ -61,7 +76,10 @@ def test_filter_demoted_removes_uncertain_from_coarse_and_classified() -> None:
 def test_filter_demoted_no_verdicts_returns_unchanged() -> None:
     coarse = [_match(1, "甲", "a", "核心名匹配：核心专业名相同")]
     out_coarse, out_classified, demoted_map = filter_demoted(
-        coarse, {1}, {}, reasons_by_idx={},
+        coarse,
+        {1},
+        {},
+        reasons_by_idx={},
     )
     assert out_coarse == coarse
     assert out_classified == {1}
@@ -74,7 +92,10 @@ def test_filter_demoted_passes_semantic_too() -> None:
         _match(10, "乙", "量子", "agent 语义匹配：方向对齐", j=50.0),
     ]
     out_sem, out_classified, demoted_map = filter_demoted(
-        semantic, {10}, {10: "存疑"}, reasons_by_idx={10: "理由"},
+        semantic,
+        {10},
+        {10: "存疑"},
+        reasons_by_idx={10: "理由"},
     )
     assert out_sem == []
     assert 10 not in out_classified
@@ -130,12 +151,18 @@ def test_build_main_results_excludes_demoted_row(tmp_path) -> None:
 
     # Apply demote upstream (as run_pipeline does).
     coarse_filtered, classified_filtered, _ = filter_demoted(
-        coarse, classified, {1: "存疑", 2: "确定"},
+        coarse,
+        classified,
+        {1: "存疑", 2: "确定"},
         reasons_by_idx={1: "方向不同"},
     )
 
     main = _build_main_results(
-        dagluben, [], coarse_filtered, [], {}, set(),
+        dagluben,
+        [],
+        coarse_filtered,
+        [],
+        {},
         classified_idx=classified_filtered,
     )
     by_idx = {r["src_row_idx"]: r for r in main}
@@ -155,7 +182,12 @@ def test_build_main_results_accepts_classified_idx_override() -> None:
     ]
     # If we pass classified_idx missing idx 1, idx 1 should fall to special.
     main = _build_main_results(
-        dagluben, [], coarse, [], {}, set(), classified_idx={2},
+        dagluben,
+        [],
+        coarse,
+        [],
+        {},
+        classified_idx={2},
     )
     by_idx = {r["src_row_idx"]: r for r in main}
     assert by_idx[2]["matched"] is True

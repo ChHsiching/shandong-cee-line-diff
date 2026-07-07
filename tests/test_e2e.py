@@ -559,15 +559,9 @@ def test_without_rename_results_renamed_set_is_empty_and_logged(
     ), "expected a 'rename pending harness dispatch' log line"
 
 
-def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_path):
-    """When semantic-match/rename_result.jsonl exists, apply_rename runs and
-    confirmed-renamed大绿本 schools get J/T=None + rename-pending log in the
-    main output, and their history majors are excluded from the被删 table.
-
-    The fixture's「新校」is a大绿本独有校 (no history) → a valid rename target
-    candidate. We stage a stub jsonl marking it as a rename of「旧校」and
-    verify the rename path is applied.
-    """
+def test_with_stub_rename_results_applies_rename(fixture_workbooks, tmp_path):
+    """#6c: rename_result.jsonl 应用后，新校←旧校 记入改名表；新校的 dagluben
+    专业通过 renamed history 用旧校线差（fixture 旧校无 history → 走 new_major）。"""
     data_dir, out_dir = _materialize_sources(fixture_workbooks, tmp_path)
     semantic_dir = tmp_path / "semantic-match"
 
@@ -597,15 +591,15 @@ def test_with_stub_rename_results_marks_rename_pending(fixture_workbooks, tmp_pa
     )
     assert report["rename_applied"] is True
     assert "新校" in report["renamed_dgl_schools"]
-    # 新校's dagluben row (人工智能) should carry the rename-pending log.
-    rename_rows_in_main = [
-        r for r in report["main_results"] if r.get("school") == "新校"
-    ]
-    assert rename_rows_in_main, "新校 row missing from main_results"
-    for r in rename_rows_in_main:
-        assert r.get("J") is None
-        assert r.get("T") is None
-        assert "可能改了名字" in r.get("log", "")
+    # 改名表含 新校←旧校。
+    rename_pairs = {
+        (r.get("new_school"), r.get("old_school")) for r in report["edge"]["rename"]
+    }
+    assert ("新校", "旧校") in rename_pairs
+    # #6c: 新校专业通过 renamed history 用旧校线差。fixture 旧校无 history
+    # → 新校专业（人工智能）走 new_major（不再 rename-pending J/T 留空）。
+    xc_in_new = [r for r in report["new_major_rows"] if r.get("school") == "新校"]
+    assert xc_in_new, "新校专业应在 new_major_rows（旧校无 history）"
 
 
 # ---------------------------------------------------------------------------

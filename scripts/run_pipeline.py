@@ -198,27 +198,38 @@ def _apply_rename(
     return [], set(), False
 
 
-def _research_summary(text: str, school: str) -> str:
-    """Concise remark from a research/<school>.md note (Task 6.3 websearch).
+def _extract_official_url(text: str) -> str:
+    """第一个官方来源 URL（教育部 moe.gov.cn / 省政府 .gov.cn）。不认第三方百科/新闻。"""
+    import re
 
-    Prefer the richest conclusion line (判定 段: 前身/更名/原名/...), skipping
-    query-statement and source-URL lines that also contain those keywords."""
-    skip = ("查询语句", "来源URL", "来源", "查询")
-    concl = ("前身", "更名", "原名", "转设", "合并", "升格", "揭牌", "教育部", "由")
+    for line in text.splitlines():
+        for m in re.findall(r"https?://[^\s)）]+", line):
+            if "moe.gov.cn" in m or ".gov.cn" in m:
+                return m
+    return ""
+
+
+def _research_summary(text: str, school: str) -> str:
+    """research md →「<结论> 来源：<官方 URL>」。
+
+    结论取含 前身/更名/原名/转设/合并 等的关键行；来源只认官方（moe.gov.cn /
+    省政府公文 .gov.cn），**不认**第三方百科/新闻。无官方来源时只给结论。
+    """
+    concl_kws = ("前身", "更名", "原名", "转设", "合并", "升格", "揭牌", "教育部", "由")
+    skip_kws = ("查询语句", "查询")
+    conclusion = ""
     cands = []
     for line in text.splitlines():
         s = line.strip().lstrip("-").lstrip("#").strip()
-        if not s or any(k in s[:8] for k in skip):
+        if not s or any(k in s[:8] for k in skip_kws):
             continue
-        if any(k in s for k in concl):
+        if any(k in s for k in concl_kws):
             cands.append(s)
     if cands:
-        return max(cands, key=len)[:100]
-    for line in text.splitlines():
-        s = line.strip().lstrip("-").lstrip("#").strip()
-        if s and not any(k in s[:8] for k in skip):
-            return s[:100]
-    return f"（见 research/{school}.md）"
+        conclusion = max(cands, key=len)[:100]
+    url = _extract_official_url(text)
+    parts = [p for p in (conclusion, f"来源：{url}" if url else "") if p]
+    return " ".join(parts) or f"（见 research/{school}.md）"
 
 
 def _enrich_rename_rows(
@@ -228,15 +239,33 @@ def _enrich_rename_rows(
 ) -> None:
     """Populate ``major_count_2026`` + websearch ``remark`` on rename rows
     (spec §6 Task 6.3) before the学校改名表 is written. apply_rename returns
-    RenameRows without these fields."""
+    RenameRows without these fields.
+
+    #7: research md 可能用新校名或旧校名命名，都试；备注格式「结论 + 官方来源
+    URL」；merge_remark 保护 manual_reviewed（人工核验过的不被网查覆盖）。
+    """
+    from scripts.rename_websearch import merge_remark
+
     cnt = collections.Counter(d.get("school", "") for d in dagluben if d.get("school"))
     rdir = Path(research_dir)
     for r in rename_rows:
         ns = r.get("new_school", "")
+        os_ = r.get("old_school", "")
         r["major_count_2026"] = cnt.get(ns, 0)
-        md = rdir / f"{ns}.md"
-        if md.exists():
-            r["remark"] = _research_summary(md.read_text(encoding="utf-8"), ns)
+        # research md 可能用新校名或旧校名命名，逐一试，取第一个有实质内容的。
+        summary = ""
+        for name in (ns, os_):
+            if not name:
+                continue
+            md = rdir / f"{name}.md"
+            if md.exists():
+                s = _research_summary(md.read_text(encoding="utf-8"), name)
+                if s and not s.startswith("（见"):
+                    summary = s
+                    break
+        if summary:
+            # merge_remark 尊重 manual_reviewed（人工核验过的备注不被覆盖）。
+            r["remark"] = merge_remark(summary, r)["remark"]
         else:
             r.setdefault("remark", f"（见 research/{ns}.md）")
 
@@ -247,7 +276,6 @@ def _build_main_results(
     coarse_results: list[MatchResult],
     semantic_results: list[MatchResult],
     new_major_estimates: dict[int, EstimateResult],
-    renamed_dgl_schools: set[str],
     *,
     classified_idx: set[int] | None = None,
 ) -> list[MatchResult]:
@@ -255,8 +283,9 @@ def _build_main_results(
 
     Resolution order (first matched wins per src_row_idx): strict → coarse →
     semantic. Unmatched results never claim a slot. Rows that survived all
-    matchers pick up the new-major estimate (if any) or the rename-pending
-    marker (if their school is a confirmed rename).
+    matchers pick up the new-major estimate (if any), otherwise the special
+    fallback (#6c: rename-pending marker removed — renamed schools now match
+    via renamed history in Stage 1-2, no J/T-empty pending rows).
 
     ``classified_idx`` (Plan v2 阻断2) optionally overrides the classified
     set — the V5-0 demote step shrinks it (drops存疑 idx) BEFORE this build so
@@ -286,20 +315,6 @@ def _build_main_results(
         if idx in by_idx:
             continue
         school = d.get("school", "")
-        if school in renamed_dgl_schools:
-            from scripts.constants import LOG_RENAME_PENDING
-
-            by_idx[idx] = MatchResult(
-                src_row_idx=idx,
-                school=school,
-                school_cat=d.get("school_cat", ""),
-                major=d.get("major", ""),
-                matched=False,
-                J=None,
-                T=None,
-                log=LOG_RENAME_PENDING,
-            )
-            continue
         est = new_major_estimates.get(idx)
         if est is not None:
             by_idx[idx] = MatchResult(
@@ -402,6 +417,30 @@ def run(
         len(dagluben),
     )
 
+    # --- 改名检测（#6c 提前到 Stage 0 后）------------------------------------
+    # rename apply 必须在 Stage 1 前：把旧校名的 history rows 的 school 替换为
+    # 新校名 → Stage 1-2 自然匹配改名校专业的旧名线差（不再 J/T 留空 pending）。
+    rename_rows, renamed_dgl_schools, rename_applied = _apply_rename(
+        dagluben,
+        history,
+        semantic_dir,
+        with_agent_results,
+    )
+    if renamed_dgl_schools:
+        old_to_new = {
+            r.get("old_school", ""): r.get("new_school", "")
+            for r in rename_rows
+            if r.get("old_school")
+        }
+        history = [
+            {**h, "school": old_to_new.get(h.get("school", ""), h.get("school", ""))}
+            for h in history
+        ]
+        logger.info(
+            "改名联动: %d 所旧校名 history 并入新校名（Stage 1-2 自动用旧名数据）",
+            len(old_to_new),
+        )
+
     # --- Stage 1 (strict) ---------------------------------------------------
     strict_results = match_strict(dagluben, history)
     strict_unmatched_dgl = [
@@ -463,13 +502,7 @@ def run(
     write_new_major_table(new_major_rows, out_dir / "新增专业.xlsx")
     logger.info("Stage3 新增专业: %d", len(new_majors))
 
-    # --- Stage 3 (rename) --------------------------------------------------
-    rename_rows, renamed_dgl_schools, rename_applied = _apply_rename(
-        dagluben,
-        history,
-        semantic_dir,
-        with_agent_results,
-    )
+    # --- 改名表写出（_apply_rename 已在 Stage 0 后跑；这里只 enrich + write）---
     _enrich_rename_rows(rename_rows, dagluben)
     write_rename_table(rename_rows, out_dir / "学校改名表.xlsx")
 
@@ -548,7 +581,6 @@ def run(
             {r["src_row_idx"] for r in strict_results if r.get("matched")}
             | {r["src_row_idx"] for r in semantic_for_main if r.get("matched")}
             | {d["src_row_idx"] for d in new_majors}
-            | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
         )
         demoted_map = {
             idx: reasons.get(idx, "")
@@ -581,7 +613,6 @@ def run(
             {r["src_row_idx"] for r in strict_results if r.get("matched")}
             | {r["src_row_idx"] for r in semantic_results if r.get("matched")}
             | {d["src_row_idx"] for d in new_majors}
-            | {d["src_row_idx"] for d in dagluben if d["school"] in renamed_dgl_schools}
         )
     )
     remaining_unmatched = [
@@ -599,7 +630,6 @@ def run(
         coarse_for_main,
         semantic_for_main,
         new_major_estimates,
-        renamed_dgl_schools,
         classified_idx=classified_for_main,
     )
     dl_path = data_dir / SOURCE_FILES["dl"]

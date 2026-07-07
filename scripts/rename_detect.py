@@ -64,7 +64,8 @@ OUTPUT_SCHEMA: dict[str, object] = {
         " old_school(从候选 candidate_old_schools 中选取,或 null 若无),"
         " confidence(agent 语义置信度,∈[0,1]),"
         " is_rename(true=确认构成改名/转设,false=候选不构成改名)。"
-        " 每个 new_school 至多一行。"
+        " 每个 (new_school, old_school) 对至多一行；合并情形一个"
+        " new_school 可多行(每行一个 old_school)。"
     ),
     "required_keys": list(REQUIRED_KEYS),
     "hard_rules": (
@@ -82,7 +83,7 @@ RENAME_PROMPT_TEXT = """\
 
 > 本任务由 harness 派发 (Agent 工具)。输入: `rename_candidates.jsonl`
 > (每行一个大绿本独有校 + 候选旧校名列表)。输出: `rename_result.jsonl`
-> (每个 new_school 至多一行 JSON)。
+> (每个 (new_school, old_school) 对一行 JSON；合并情形一个 new_school 可多行)。
 
 ## 背景
 
@@ -98,8 +99,8 @@ RENAME_PROMPT_TEXT = """\
 对 `rename_candidates.jsonl` 中每个 `new_school`：
 
 1. 审查其 `candidate_old_schools`(全部历史独有校,按字符串相似度排序,**仅作提案**——真正的旧校名可能字面差异很大,如「佛山科学技术学院」→「佛山大学」字面几乎无关却是同一所,不要因相似度低就放过,必要时上网搜 new_school 官方信息确认前身/更名/转设/合并)。
-2. 用语义判断: 该 new_school 是否与某候选 old_school 是**同一所学校的改名/
-   转设/合并**? 如是, 选出最可能的 old_school; 若候选均不构成, 选 null。
+2. 用语义判断: 该 new_school 是否与候选 old_school 是**同一所学校的改名/
+   转设/合并**? 如是, 选出构成改名的 old_school（合并情形可能多个,每个输出一行）; 若候选均不构成, 选 null。
 3. 给出 `confidence` ∈ [0,1] 的语义置信度(非字符串相似度)。
 4. `is_rename`: true=确认改名/转设; false=候选不构成改名(该校可能是真新增校)。
 
@@ -118,7 +119,7 @@ RENAME_PROMPT_TEXT = """\
   最终 jsonl 只需四字段)。
 - `old_school` 必须逐字来自 `candidate_old_schools` 或为 `null`。
 - `confidence` 严格 ∈ [0,1] (越界整批拒)。
-- 每个 `new_school` 至多一行。
+- 每个 (new_school, old_school) 对至多一行；合并情形一个 new_school 输出多行（每行一个 old_school）。
 - 字段缺一不可。
 """
 
@@ -361,22 +362,25 @@ def apply_rename(
                     f"{path.name}:{lineno}: new_school={new_school!r} "
                     f"不是大绿本独有校(必须在2026大绿本且不在历史中)"
                 )
-            if new_school in seen:
-                raise RenameContractError(
-                    f"{path.name}:{lineno}: new_school={new_school!r} "
-                    f"重复出现(每校至多一行)"
-                )
-            seen.add(new_school)
-
             # old_school: must be a non-empty string when is_rename=True.
             if not isinstance(old_raw, str) or old_raw.strip() == "":
                 raise RenameContractError(
                     f"{path.name}:{lineno}: is_rename=True 但 old_school 为空"
                 )
+            old_school = old_raw.strip()
+            # 合并情形：一个 new_school 可对应多个 old_school（多行，每对一个）。
+            # 同一 (new_school, old_school) 对至多一行。
+            pair = (new_school, old_school)
+            if pair in seen:
+                raise RenameContractError(
+                    f"{path.name}:{lineno}: (new_school={new_school!r}, "
+                    f"old_school={old_school!r}) 重复出现(每对至多一行)"
+                )
+            seen.add(pair)
             rename_table.append(
                 RenameRow(
                     new_school=new_school,
-                    old_school=old_raw.strip(),
+                    old_school=old_school,
                     confidence=conf,
                     is_rename=True,
                     major_count_2026=major_count.get(new_school, 0),
