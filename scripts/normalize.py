@@ -116,9 +116,14 @@ def strip_ignore_brackets(name: str) -> str:
         content = match.group(1)
         if not _is_ignore_bracket(content):
             return match.group(0)
-        # Bracket has ignore content. Preserve a gender token if present.
+        # Bracket has ignore content. Preserve gender + 「面向…就业」方向
+        # （公安/师范类同性别下分就业方向，不能一起剥掉塌缩 — Bug #4 残留）。
         if _GENDER_RE.search(content):
-            return "(男)" if "男" in content else "(女)"
+            gender = "男" if "男" in content else "女"
+            m_face = re.search(r"面向[^,，;；()]+就业", content)
+            if m_face:
+                return f"({gender},{m_face.group(0)})"
+            return f"({gender})"
         return ""
 
     return _BRACKET_RE.sub(_reduce, cleaned)
