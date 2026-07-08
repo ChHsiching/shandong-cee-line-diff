@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import collections
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -370,6 +371,38 @@ def _build_main_results(
     return [by_idx[d["src_row_idx"]] for d in dagluben]
 
 
+_ONE_LINE_PAIR_RE = re.compile(r"(20\d{2})\s*=\s*(\d{2,3})")
+
+
+def read_one_line_from_notes(
+    j3_path: str | Path, notes_sheet: str = "说明"
+) -> dict[int, int] | None:
+    """从近三年统计表「说明」sheet 自动读一段线。
+
+    找到文本含「一段线」的单元格，抽其中的「年份=分数」对（≥2 年才算数）。
+    找不到返回 None，调用方退到 ``constants.ONE_LINE`` 默认。根除 BUG-1 那类
+    硬编码——数据年年变，一段线写在说明 sheet 里就该自动用，不靠手改 help/常量。
+    """
+    path = Path(j3_path)
+    if not path.exists():
+        return None
+    wb = load_workbook(path, data_only=True, read_only=True)
+    try:
+        sheets = [notes_sheet] if notes_sheet in wb.sheetnames else list(wb.sheetnames)
+        for sn in sheets:
+            for row in wb[sn].iter_rows(values_only=True):
+                for cell in row:
+                    if isinstance(cell, str) and "一段线" in cell:
+                        pairs = {
+                            int(y): int(v) for y, v in _ONE_LINE_PAIR_RE.findall(cell)
+                        }
+                        if len(pairs) >= 2:
+                            return pairs
+    finally:
+        wb.close()
+    return None
+
+
 def run(
     data_dir: str | Path,
     out_dir: str | Path,
@@ -433,6 +466,14 @@ def run(
     tq_path = data_dir / files["tq"]
     tq_rows = _load_rows(tq_path) if tq_path.exists() else []
     dl_rows = _load_rows(data_dir / files["dl"])
+
+    # 未显式传 one_line 时，自动从「说明」sheet 读一段线——数据年年变，写在
+    # 说明 sheet 里就该自动用，不靠手改 help/常量（BUG-1 那类 Bug 的根除）。
+    if one_line is None:
+        auto_one_line = read_one_line_from_notes(data_dir / files["j3"])
+        if auto_one_line:
+            one_line = auto_one_line
+            logger.info("一段线: 自动从「说明」sheet 读取 %s", auto_one_line)
 
     history = build_unified_history(
         j3_rows,
@@ -766,7 +807,7 @@ def add_source_files_args(parser: argparse.ArgumentParser) -> None:
         "--one-line",
         default=None,
         help="一段线，格式「年份=分数」逗号分隔，如「2023=443,2024=444,2025=441」"
-        "（覆盖内置默认 constants.ONE_LINE）",
+        "（覆盖默认；不传则自动从近三年表「说明」sheet 读，再退到内置默认）",
     )
     parser.add_argument(
         "--supplement-batches",

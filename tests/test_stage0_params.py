@@ -10,6 +10,40 @@ from __future__ import annotations
 from scripts import stage0_merge
 
 
+def test_read_one_line_from_notes_parses_years(tmp_path) -> None:
+    """BUG-1 根除：从近三年表「说明」sheet 自动读一段线，不靠手改 help/常量。"""
+    from openpyxl import Workbook
+
+    from scripts.run_pipeline import read_one_line_from_notes
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "说明"
+    ws.append(["项目", "说明"])
+    ws.append(["线差口径", "low_score - 山东一段线；2023=443, 2024=444, 2025=441"])
+    p = tmp_path / "近三年.xlsx"
+    wb.save(p)
+
+    assert read_one_line_from_notes(p) == {2023: 443, 2024: 444, 2025: 441}
+
+
+def test_read_one_line_from_notes_returns_none_when_missing(tmp_path) -> None:
+    """说明 sheet 没有「一段线」单元格 → 返回 None（调用方退到 constants 默认）。"""
+    from openpyxl import Workbook
+
+    from scripts.run_pipeline import read_one_line_from_notes
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "说明"
+    ws.append(["项目", "说明"])
+    ws.append(["统计年份", "仅使用 2023、2024、2025"])  # 无「一段线」
+    p = tmp_path / "近三年.xlsx"
+    wb.save(p)
+
+    assert read_one_line_from_notes(p) is None
+
+
 def _tq_row(
     batch: str = "本科提前批A类", school: str = "X大学", major: str = "数学", low=500
 ) -> tuple:
