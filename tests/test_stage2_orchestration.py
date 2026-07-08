@@ -209,6 +209,15 @@ def test_write_prompts_embeds_cardinality_matching_rule(tmp_path: Path) -> None:
     assert "中外合作" in rule
 
 
+def test_matching_rule_allows_specific_vs_dalei(tmp_path: Path) -> None:
+    """OPP-1（fresh-test 2026-07-08）：今年 X（具体，如经济学）↔ 往年 X类（大类）
+    可匹配——按实际描述判大类是否覆盖该具体。drift guard：规则须含这条。"""
+    from scripts.stage2_agent import MATCHING_RULE
+
+    assert "X↔X类" in MATCHING_RULE or ("X类" in MATCHING_RULE and "大类" in MATCHING_RULE)
+    assert "经济学" in MATCHING_RULE  # 具体例子
+
+
 # ---------------------------------------------------------------------------
 # apply_results
 # ---------------------------------------------------------------------------

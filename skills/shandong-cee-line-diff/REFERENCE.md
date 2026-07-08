@@ -73,18 +73,17 @@ PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output \
     --intermediate-dir intermediate --semantic-dir semantic-match
 ```
 
-exit 0 才算完成。检查内容：
+exit 0 才算完成。**实际检查（`audit_output.py` 共 5 项）**：
 
-| 检查 | 说明 |
+| check | 说明 |
 |------|------|
-| 每个 agent 匹配的都有复核结果且判「确定」 | 没复核的 or 判存疑的不能留主表 |
-| 每个本科专业都有匹配方式标注 | 不能有空 |
-| 每张产出表没有全空行 | |
-| 每张产出表至少有 1 行数据 | |
-| 匹配到的线差和标准差与往年源数据一致 | 容差 0.011（舍入误差） |
-| 每个消失/新增的学校都有网查记录 | 改名的已确认并应用 |
-| 核心专业名列没有残留括号 | 去括号要干净（含嵌套） |
-| 无法匹配的只剩下往年真的没有同核心专业名的 | 不应该有大类变体混在里面 |
+| `judgmental_coverage` | 每个 agent 判断型匹配都有复核结果且判「确定」；没复核 / 判存疑的不留主表 |
+| `nonempty_log` | 每个本科专业都有匹配方式标注（不能空） |
+| `no_empty_rows` | 每张产出表没有全空行 |
+| `tables_nonempty` | 每张产出表至少 1 行数据 |
+| `jt_consistency` | 匹配到的线差 / 标准差与往年源数据一致（容差 0.011） |
+
+> **以下尚未实现审计**（fresh-test 2026-07-08 痛点 4 指出，待补）：① 每个消失 / 新增校有网查记录（改名表 `is_rename=true` 行备注非空且含官方链接）；② 核心专业名列无残留括号；③ 未能匹配表不该有大类变体残留（X / X类，待 OPP-1 domain policy 定了再加）。目前靠 agent 自查 + 改名表 `note` 直填备注保证。
 
 ## run_pipeline CLI 参数（覆盖默认，不特化数据）
 
@@ -144,13 +143,17 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 3. **第二次跑管线**（apply 改名 → 重生成改名感知 batch）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → 旧校名 history 并入新校名，**改名校的专业这次有候选了**，Stage2 batch prompt 重新生成（改名感知）。
-4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`，每批派 subagent（**并发 ≤6**，多了触发 429），结果写 `semantic-match/batch_NN_result.jsonl`（每行 `{src_row_idx, school, major, match, J, T, reason}`）。**注意**：major/reason 字段若含双引号须转义 `\"`（专业名如「法学类(...)(含"法学+英语"...)」），否则 JSON 非法。
-5. **第三次跑管线**（apply 语义结果，产出 verify prompt）：
+4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`（自带 `matching_rule`），每批派 subagent（**并发 ≤6**，多了触发 429）。结果**用 helper 写、不手写 JSON**：agent 每条判写成 TSV `src_row_idx<TAB>cand_index(0起/-)<TAB>reason` 存 `decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode batch --prompt semantic-match/batch_NN_prompt.json --decisions semantic-match/decisions_NN.tsv --out semantic-match/batch_NN_result.jsonl`（helper 反填 match/J/T，消除双引号/弯引号转义坑）。
+5. **第三次跑管线**（apply 语义结果）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
-6. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`，派 subagent（并发 ≤6），结果写 `semantic-match/verify_batch_NN_result.jsonl`（每行 `{src_row_idx, verdict, reason}`）。
-7. **第四次跑管线**（apply 复核结果，产出最终 8 张表）：
+   → apply batch_*_result.jsonl。**注意：run_pipeline 不产出 verify prompt**——下一步单独跑。
+6. **产出 verify prompt**（独立步骤，run_pipeline 不代劳，**别漏**）：
+   `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_stage_verify_prep --data-dir data --out-dir output --semantic-dir semantic-match`
+   → 抽判断型匹配 + 往年同核心数，写 `semantic-match/verify_batch_NN.json`（每 item 自带 `requirement`）。
+7. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`（每 item 的 `requirement`），派 subagent（并发 ≤6）。结果用 helper 写：TSV `src_row_idx<TAB>verdict(确定/存疑)<TAB>reason` 存 `verify_decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode verify --prompt semantic-match/verify_batch_NN.json --decisions semantic-match/verify_decisions_NN.tsv --out semantic-match/verify_batch_NN_result.jsonl`。
+8. **第四次跑管线**（apply 复核结果，产出最终 8 张表）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
-8. **跑审计**：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
+9. **跑审计**：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
 
 每一步查中间结果用 `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.show_table output/<表>.xlsx [--head N] [--grep 词]`。
 

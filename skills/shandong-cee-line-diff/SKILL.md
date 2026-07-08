@@ -18,18 +18,31 @@ plugin 根（$P）含 scripts/ + .venv。**Claude Code**：plugin 自带 Session
 **直接跑这一段**（定位 plugin 根 + 验证环境就绪）：
 
 ```bash
-# 优先选已建好 .venv 的副本（Claude Code 的 cache 副本有；marketplace 副本没有），
-# 没有任何副本带 .venv 时退到任意副本，再由下面的 fallback 建 venv。
-P=""
-for sk in $(find ~/.claude/plugins ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*"); do
+# 定位 plugin 根：读每个副本 plugin.json 的 version，挑版本号最大的；
+# 只搜 cache/ + 其他 harness 安装目录，排除 marketplaces/（源克隆，不是运行副本）。
+# 不按 .venv 选——venv 由 SessionStart hook / 下面 fallback 建，避免选到 stale 旧版。
+P=""; best=""
+for sk in $(find ~/.claude/plugins/cache ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*"); do
   d=$(dirname "$(dirname "$(dirname "$sk")")")
-  [ -x "$d/.venv/bin/python" ] && P="$d"
+  v=$(grep -m1 -o '"version":[[:space:]]*"[^"]*"' "$d/.claude-plugin/plugin.json" 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+  if [ -n "$v" ] && { [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -V | tail -1)" = "$v" ]; }; then
+    best="$v"; P="$d"
+  fi
 done
-[ -z "$P" ] && P=$(find ~/.claude/plugins ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*" | sort -V | tail -1 | xargs dirname | xargs dirname | xargs dirname)
-PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --help >/dev/null 2>&1 && echo "✓ 环境就绪, PLUGIN_ROOT=$P"
+# 退化：上面没找到（如只剩 marketplaces 源克隆）再全搜一遍按版本取最大。
+if [ -z "$P" ]; then
+  for sk in $(find ~/.claude/plugins ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*"); do
+    d=$(dirname "$(dirname "$(dirname "$sk")")")
+    v=$(grep -m1 -o '"version":[[:space:]]*"[^"]*"' "$d/.claude-plugin/plugin.json" 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+    if [ -n "$v" ] && { [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -V | tail -1)" = "$v" ]; }; then
+      best="$v"; P="$d"
+    fi
+  done
+fi
+PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --help >/dev/null 2>&1 && echo "✓ 环境就绪, PLUGIN_ROOT=$P (v$best)"
 ```
 
-> 为什么不只 `sort -V | tail -1`：Claude Code 同时装了 `marketplaces/`（无 `.venv`）和 `cache/`（有 `.venv`，真正运行的那份）两个副本，`sort -V` 可能选中无 `.venv` 的那个，导致 `"$P/.venv/bin/python"` 报 command not found。上面优先挑含 `.venv` 的副本，绕开这个坑。
+> 为什么读 `plugin.json` 版本而不是按 `.venv` 选：Claude Code 的 cache 里可能同时留多个版本（旧版残留 + 新版），旧版往往已建好 `.venv`、新版还没建——按 `.venv` 选会选到 stale 旧版（实测：1.2.2 有 venv、1.3.0 没有，就错选了 1.2.2，导致一堆已修 bug 被当成新 bug 报）。读 `plugin.json` 的 `version` 取最大，永远选最新装的那份；`.venv` 由 hook/fallback 在那份上建。同时排除 `marketplaces/`（源克隆，不运行），避免和 `cache/` 混。
 
 看到 `✓ 环境就绪` 就直接进第一步。**如果 `$P/.venv` 不存在**（hook 没跑成，比如 python3 缺失），fallback 手动建一次：
 ```bash
@@ -111,6 +124,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 - **永远不算身份的差异**（任何时候都当核心名本身看，对得上就匹配）：
   - **培养模式标签**：拔尖、卓越、创新、英才、基地、未来、试验班、订单班等「XX 班」——只是培养组织方式，不创造新专业。往年「数学」对今年「数学(拔尖)」永远没问题，哪怕往年同核心有多个。
   - **描述性噪音**：标点、词序、体检/身高/色盲、学费、语种、章程引用、加减括号内容、子专业清单的大段描述。今年的专业名通常比往年起得长（大绿本写一大段），往年通常就一个短名——看核心名 + 主要方向就够，多余描述不影响。
+- **大类 ↔ 具体是一对多的常见形式**：往年按「经济学类」大类招、今年拆成「经济学」等具体——这是 **1 个往年大类 ↔ 今年具体**，属**一对多**（基数规则允许），配（往年大类线差作参考）。同理 护理学↔护理学类、法学↔法学类。宽大类（「工科试验班类」混杂方向、录取分差大）对不上→走第五步估算，别一刀切。
 - **一对多时被吸收、一对一时才算不同专业的差异**：中外合作、师范、性别（男/女）、招生类别（普通/地方专项/综合评价）、真正不同的方向（如「投资学(量化投资)」≠「投资学」）。
   - 往年同核心只 1 个（**一对多**）→ 今年这些变体也都匹配那 1 个（只有这 1 个数据可用）。
   - 往年同核心多个（**一对一**）→ 这些差异就是不同专业了，今年每个专业按描述挑往年**一个**对应的；今年这个专业若往年只有「中外合作」「师范」、今年是「普通」这种对不上的，就别硬配，走第五步估算。

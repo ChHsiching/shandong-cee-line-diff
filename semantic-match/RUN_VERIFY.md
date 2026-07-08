@@ -26,7 +26,18 @@
 
 ## STEP 2 — harness 侧派发复核 agent
 
-对每个 `verify_batch_NN.json`，派发一个 `Agent(general-purpose)`，让子代理读该文件本身——里面自带 `output_schema` + 每条 item 的 `requirement`（按往年同核心数动态生成的判定规则：past=1→一对多全确定，past>1→培养模式标签确定/中外合作·师范·类别·真方向存疑）。要求 agent 按每条 item 的 `requirement` 判「确定」/「存疑」，输出写到 `semantic-match/verify_batch_NN_result.jsonl`。**不要另写规则文档**——规则就在每条 item 的 `requirement` 里。
+对每个 `verify_batch_NN.json`，派发一个 `Agent(general-purpose)`，让子代理读该文件本身——里面自带 `output_schema` + 每条 item 的 `requirement`（按往年同核心数动态生成的判定规则：past=1→一对多全确定，past>1→培养模式标签确定/中外合作·师范·类别·真方向存疑）。要求 agent 按每条 item 的 `requirement` 判「确定」/「存疑」。**不要另写规则文档**——规则就在每条 item 的 `requirement` 里。
+
+**结果用 helper 写、不要手写 JSON**（reason 含引号/弯引号时手写 JSON 会炸）：agent 把每条判写成 TSV——一行 `src_row_idx<TAB>verdict(确定/存疑)<TAB>reason`，存成 `verify_decisions_NN.tsv`，再跑：
+
+```bash
+PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.write_batch_result \
+  --mode verify --prompt semantic-match/verify_batch_NN.json \
+  --decisions semantic-match/verify_decisions_NN.tsv \
+  --out semantic-match/verify_batch_NN_result.jsonl
+```
+
+helper `json.dumps` 出合法 jsonl，agent 零手写 JSON。verdict 非 确定/存疑 或漏判会在写文件前报错。
 
 并行模式同 Stage2 语义匹配（见 `semantic-match/RUN.md`）。
 
