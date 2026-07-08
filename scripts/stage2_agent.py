@@ -39,6 +39,7 @@ __all__ = [
     "build_batches",
     "write_prompts",
     "OUTPUT_SCHEMA",
+    "MATCHING_RULE",
 ]
 
 # JSON schema description embedded into every prompt file so the dispatched
@@ -62,6 +63,24 @@ OUTPUT_SCHEMA: dict[str, object] = {
         "reason",
     ],
 }
+
+# 匹配规则（单一真理源 = SKILL §3「基数规则」；与 verify_judgment 的 requirement
+# 保持一致）。每个 batch prompt 内联一份，让被派发的 subagent 不必再翻 SKILL.md
+# —— 曾因 prompt 里没规则，subagent 各自重读 SKILL 还把培养模式标签判错。
+MATCHING_RULE: str = (
+    "判断今年每个专业和往年哪个候选是同一个专业。基数规则(单一判据): "
+    "一对一、一对多可以; 多对一不行。往年数据是基准, 今年往往年上靠。"
+    "(1) 候选只有 1 个 → 就是它(一对多: 今年这个核心名下的多个变体都配这 1 个"
+    "往年专业, 因为只有这 1 个数据可用)。"
+    "(2) 候选多个 → 今年每个专业按实际描述挑往年 1 个对应(一对一, 不能把往年"
+    "多个并到今年 1 个上=多对一)。永远不算身份的差异: 培养模式标签(拔尖/卓越/"
+    "创新/英才/基地/未来/试验班/订单班等「XX 班」)、描述性噪音(标点/词序/体检"
+    "/学费/语种/加减括号内容/子专业清单长描述)——对得上就配。一对一时算不同"
+    "专业的差异: 中外合作、师范、性别(男/女)、招生类别(普通/地方专项/综合"
+    "评价)、真正不同的方向(如投资学(量化投资)≠投资学)——今年这个专业若往年"
+    "只有这些对不上的类别, 就配 null(交估算), 别硬配。含弯引号须从 prompt 原文"
+    "逐字复制到 match。"
+)
 
 
 @dataclass(frozen=True)
@@ -184,8 +203,10 @@ def write_prompts(batches: Sequence[Batch], out_dir: Path) -> list[Path]:
     """Write one ``batch_NN_prompt.json`` per batch into ``out_dir``.
 
     Each file is a dict with ``batch`` (1-based index), ``items`` (full
-    dagluben info + candidates), and ``output_schema`` (the inline contract
-    the agent must obey). Returns the paths in batch order.
+    dagluben info + candidates), ``output_schema`` (the inline contract the
+    agent must obey), and ``matching_rule`` (the基数规则, inline so each
+    dispatched subagent has it without re-reading SKILL.md). Returns paths
+    in batch order.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -196,6 +217,7 @@ def write_prompts(batches: Sequence[Batch], out_dir: Path) -> list[Path]:
             "batch": b.index,
             "items": [_item_payload(it) for it in b.items],
             "output_schema": OUTPUT_SCHEMA,
+            "matching_rule": MATCHING_RULE,
         }
         path = out_dir / f"batch_{b.index:02d}_prompt.json"
         path.write_text(

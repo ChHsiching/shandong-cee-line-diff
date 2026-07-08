@@ -29,7 +29,7 @@ from scripts.constants import (
     LOG_FLIGHT_UNMATCHED,
     LOG_VERIFY_DEMOTE_PREFIX,
 )
-from scripts.models import DaglubenRow, HistoryRow
+from scripts.models import DaglubenRow, EstimateResult, HistoryRow
 
 __all__ = [
     "DeletedMajor",
@@ -69,6 +69,13 @@ class EdgeRow(TypedDict, total=False):
     subject: str
     batch: str
     log: str
+    # 估算（仅「对不上」的 other 行填；飞行/无历史的不填）：同校同选科均值。
+    # 用户口径（2026-07-08）：同核心多对一/类别对不上 = 无有效对应 → 按新专业
+    # 估算同校同选科均值 + 备注，不留在表里空着。
+    est_value: float | None  # 统计线差估算
+    est_t: float | None  # 线差标准差估算
+    est_level: int  # 0=同校同选科 1=同校全专业 2=无法估算
+    est_n: int  # 用了几条往年数据
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +166,7 @@ def flight_and_special(
     other_unmatched: Sequence[DaglubenRow],
     demoted_map: dict[int, str] | None = None,
     history: Sequence[HistoryRow] | None = None,
+    estimates: dict[int, EstimateResult] | None = None,
 ) -> list[EdgeRow]:
     """Route flight(军队) and remaining-unmatched大绿本 rows to the特殊表.
 
@@ -212,16 +220,23 @@ def flight_and_special(
             log = f"{LOG_VERIFY_DEMOTE_PREFIX}：{demoted_map[idx]}"
         else:
             log = _unmatched_log(d, history or [])
-        out.append(
-            EdgeRow(
-                src_row_idx=idx,
-                school=d.get("school", ""),
-                school_cat=d.get("school_cat", ""),
-                major=d.get("major", ""),
-                core=d.get("core", ""),
-                subject=d.get("subject", ""),
-                batch=d.get("batch", ""),
-                log=log,
-            )
+        edge = EdgeRow(
+            src_row_idx=idx,
+            school=d.get("school", ""),
+            school_cat=d.get("school_cat", ""),
+            major=d.get("major", ""),
+            core=d.get("core", ""),
+            subject=d.get("subject", ""),
+            batch=d.get("batch", ""),
+            log=log,
         )
+        # 对不上的行（同核心多对一/类别冲突）→ 按同校同选科均值估算（用户口径
+        # 2026-07-08：不留在表里空着）。飞行/无历史的不估（estimates 不含它们）。
+        est = (estimates or {}).get(idx)
+        if est is not None:
+            edge["est_value"] = est.get("value")
+            edge["est_t"] = est.get("T")
+            edge["est_level"] = est.get("level")
+            edge["est_n"] = est.get("n")
+        out.append(edge)
     return out

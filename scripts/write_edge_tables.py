@@ -310,6 +310,10 @@ _SPECIAL_HEADER: tuple[str, ...] = (
     "核心名",
     "选科",
     "批次",
+    "统计线差估算",
+    "线差标准差估算",
+    "估算方式",
+    "用了几条往年数据",
     "原因说明",
 )
 
@@ -320,6 +324,9 @@ def write_special_table(
     """Write ``未能匹配的专业.xlsx`` — 飞行技术(军队) 提前批池匹配不成 + 其余无法
     归类的大绿本行. Each EdgeRow preserves the originating DaglubenRow fields
     (src_row_idx / school / major / core / subject / batch) + log (spec §9).
+
+    「对不上」的行（同核心多对一/类别冲突）带估算（同校同选科均值，复用
+    :data:`_LEVEL_LABELS`）；飞行/无历史的行估算列留空。
 
     EdgeRow fields are remapped to the header columns — ``_write_simple_table``
     looks cells up by header name."""
@@ -332,6 +339,14 @@ def write_special_table(
             "核心名": r.get("core", ""),
             "选科": r.get("subject", ""),
             "批次": r.get("batch", ""),
+            "统计线差估算": r.get("est_value"),
+            "线差标准差估算": r.get("est_t"),
+            "估算方式": (
+                _LEVEL_LABELS.get(r.get("est_level"), "")
+                if r.get("est_level") is not None
+                else ""
+            ),
+            "用了几条往年数据": r.get("est_n"),
             "原因说明": r.get("log", ""),
         }
         for r in special_rows

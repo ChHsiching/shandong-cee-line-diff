@@ -94,17 +94,15 @@ def filter_demoted(
     return out_results, out_classified, demoted_map
 
 
-# Inline output contract shipped in every prompt file.
+# Inline output contract shipped in every prompt file. Field contract only —
+# the judgment *rule* lives in the per-item ``requirement`` field (single source
+# of truth, see :func:`_requirement_text`), so the two never drift apart.
 OUTPUT_SCHEMA: dict[str, object] = {
     "description": (
         "每条 item 输出一行 JSON, 写入 verify_batch_NN_result.jsonl。字段:"
         " src_row_idx(与输入相同), verdict(只允许「确定」或「存疑」),"
         " reason(非空, ≤30字, 说明判定依据)。每 src_row_idx 至多一行。"
-        " 判定原则: 该配对是否确定正确? 六要素(核心名/性别/合作/校区/方向/"
-        "招生类别)是否真对齐? 方向不同(如投资学(量化投资)≠投资学)→存疑。"
-        "重要规则: 这所学校往年只有 1 个同核心专业名时, 今年的专业不管改方向/"
-        "改名/换措辞(标点/词序/加减括号内容)都是同一个专业, 判确定——只有往年"
-        "有多个同核心名时才需细比方向。不确定就判存疑, 宁可保守。"
+        " 判定原则见每条 item 的 requirement 字段(按往年同核心数动态给出)。"
     ),
     "required_keys": ["src_row_idx", "verdict", "reason"],
     "allowed_verdicts": ["确定", "存疑"],
@@ -157,15 +155,41 @@ def is_judgmental(match: MatchResult) -> bool:
     return any(log.startswith(p) for p in JUDGMENT_LOG_PREFIXES)
 
 
-def _requirement_text(dagluben: DaglubenRow, cand: HistoryRow) -> str:
-    """The judgment requirement shown to the agent for one item."""
+def _requirement_text(
+    dagluben: DaglubenRow, cand: HistoryRow, past_same_core: int = 0
+) -> str:
+    """The judgment requirement shown to the agent for one item.
+
+    单一真理源：verify 判定规则只在此（与 SKILL §3 一致），按往年同核心专业数
+    ``past_same_core`` 动态生成，避免与 OUTPUT_SCHEMA 复述 drift。
+
+    - ``past_same_core <= 1``（一对多）: 往年同核心只 1 个 → 今年任何**校内**
+      变体（培养模式标签 / 方向措辞 / 中外合作 / 性别 / 标点括号）都和这 1 个
+      往年专业是同一专业 → 判确定。
+    - ``past_same_core > 1``: 往年同核心有多个 → agent 已从中选了 1 个；培养
+      模式标签差异不影响身份 → 判确定，但中外合作 / 师范 / 招生类别 / 真方向
+      实质不同 → 判存疑。
+
+    注：培养模式标签 = 拔尖/卓越/创新/英才/基地/未来/试验班/订单班等「班」
+    类标签；它们不改变专业身份，只是培养组织方式。不同校区 = 不同学校
+    （独立招生校区应在匹配前就拆成不同学校），不该出现在同校配对里。
+    """
+    common_tail = (
+        "真正不同的专业(如投资学(量化投资)≠投资学、不同招生类别)才存疑。"
+        "不同校区=不同学校, 不该出现在同校配对里。不确定→存疑, 宁可保守。"
+    )
+    if past_same_core <= 1:
+        return (
+            "判定该配对是否确定正确。重要规则(一对多): 这所学校往年同核心专业"
+            "只 1 个, 今年的专业不管怎么变都是同一个专业——换培养模式标签"
+            "(拔尖/卓越/创新/英才/基地/未来/试验班/订单班)、改方向措辞、中外合作、"
+            "性别、标点/词序/加减括号——一律判确定。" + common_tail
+        )
     return (
-        "判定该配对是否确定正确。六要素(核心名/性别/合作/校区/方向/招生类别)"
-        "是否真对齐? 大绿本专业带方向括号时须与候选方向一致"
-        "(如投资学(量化投资)≠投资学)。重要规则: 这所学校往年只有 1 个同核心"
-        "专业名时, 今年的专业不管改方向/改名/换措辞(标点/词序/加减括号内容)都"
-        "是同一个专业, 判确定——只有往年有多个同核心名时才需细比方向。"
-        "不确定→存疑, 宁可保守。"
+        "判定该配对是否确定正确。往年同核心专业有多个, agent 已从中选了 1 个:"
+        "培养模式标签差异(拔尖/卓越/创新/英才/基地/未来/试验班/订单班等)不"
+        "影响专业身份 → 判确定; 但中外合作/师范/招生类别/真方向实质不同 → 判存疑。"
+        + common_tail
     )
 
 
@@ -192,6 +216,13 @@ def build_verify_batches(
     dgl_by_idx: dict[int, DaglubenRow] = {d.get("src_row_idx", 0): d for d in dagluben}
     hist_list = list(history)
 
+    # Pre-index往年同核心数 by (school, core) so the per-item requirement can
+    # route to the一对多 (past=1) vs 细比 (past>1) regime without re-scanning.
+    past_core_count: dict[tuple[str, str], int] = {}
+    for h in hist_list:
+        key = (h.get("school", ""), h.get("core", ""))
+        past_core_count[key] = past_core_count.get(key, 0) + 1
+
     items: list[VerifyBatchItem] = []
     for m in judgment_matches:
         if not is_judgmental(m):
@@ -202,12 +233,13 @@ def build_verify_batches(
             # No dagluben row for this idx — cannot build a verify item.
             continue
         cand = _locate_candidate(d, m, hist_list)
+        same_core_n = past_core_count.get((d.get("school", ""), d.get("core", "")), 0)
         items.append(
             VerifyBatchItem(
                 dagluben=d,
                 matched_candidate=cand,
                 match=m,
-                requirement=_requirement_text(d, cand),
+                requirement=_requirement_text(d, cand, same_core_n),
             )
         )
 

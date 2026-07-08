@@ -137,6 +137,41 @@ def test_flight_rows_unmatched_become_special() -> None:
     assert "没找到" in other[0]["log"]
 
 
+def test_flight_and_special_attaches_estimates_to_other_not_flight() -> None:
+    """Task 3: 「对不上」的 other 行带估算（同校同选科均值），飞行行不带。"""
+    from scripts.models import EstimateResult
+
+    flight = [
+        DaglubenRow(
+            school="空军航空大学",
+            major="飞行技术",
+            batch=FLIGHT_BATCH,
+            src_row_idx=7,
+        ),
+    ]
+    other = [
+        DaglubenRow(school="甲大学", major="工科试验班类", batch="4.常规批", src_row_idx=9),
+    ]
+    estimates = {
+        9: EstimateResult(value=82.5, T=3.2, level=0, n=12, log="新增专业：估算=同校同选科(12)均值=82.5"),
+    }
+
+    special = flight_and_special(flight, other, estimates=estimates)
+
+    by_idx = {r["src_row_idx"]: r for r in special}
+    # other 行带上估算四件套
+    assert by_idx[9]["est_value"] == 82.5
+    assert by_idx[9]["est_level"] == 0
+    assert by_idx[9]["est_n"] == 12
+    # 飞行行不带估算字段
+    assert "est_value" not in by_idx[7]
+
+    # estimates=None（默认）时 other 行也不带估算字段（向后兼容）
+    special_no_est = flight_and_special(flight, other)
+    by_idx_no = {r["src_row_idx"]: r for r in special_no_est}
+    assert "est_value" not in by_idx_no[9]
+
+
 def test_flight_and_special_empty_inputs_returns_empty() -> None:
     assert flight_and_special([], []) == []
 

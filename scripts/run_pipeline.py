@@ -166,6 +166,11 @@ def _apply_stage2(
         return applied_results, still, True
 
     # No results to apply → emit batch prompts for harness dispatch.
+    # ISSUE-5: 先清掉旧的 batch_*_prompt.json——改名/数据变化后批次数会变，
+    # 残留的 stale prompt 带过时候选，被 agent 误派会用错数据（run_stage_verify_prep
+    # 已对 verify_batch_*.json 这么做，照搬）。
+    for stale in sorted(semantic_dir.glob("batch_*_prompt.json")):
+        stale.unlink()
     batches = build_batches(post_coarse_unmatched, history, batch_size=20)
     write_prompts(batches, semantic_dir)
     logger.info(
@@ -264,6 +269,10 @@ def _enrich_rename_rows(
         ns = r.get("new_school", "")
         os_ = r.get("old_school", "")
         r["major_count_2026"] = cnt.get(ns, 0)
+        # BUG-4: agent 在 rename_result.jsonl 填的 note（结论+官方链接）已进 remark，
+        # 是改名表备注的权威来源——有就不覆盖。没有才回退到 research/<校名>.md 扫描。
+        if (r.get("remark") or "").strip():
+            continue
         # research md 可能用新校名或旧校名命名，逐一试，取第一个有实质内容的。
         summary = ""
         for name in (ns, os_):
@@ -647,8 +656,18 @@ def run(
     _flight_label = flight_batch or FLIGHT_BATCH
     flight = [d for d in remaining_unmatched if d.get("batch") == _flight_label]
     other = [d for d in remaining_unmatched if d.get("batch") != _flight_label]
+    # 「对不上」的 other 行（同核心多对一/类别冲突/大类无有效对应）→ 按同校同选科
+    # 均值估算（用户口径 2026-07-08：不留在表里空着）。飞行/无历史的不在此列。
+    other_estimates: dict[int, EstimateResult] = {
+        d["src_row_idx"]: estimate(d, by_school.get(d.get("school", ""), []))
+        for d in other
+    }
     special_rows = flight_and_special(
-        flight, other, demoted_map=demoted_map, history=history
+        flight,
+        other,
+        demoted_map=demoted_map,
+        history=history,
+        estimates=other_estimates,
     )
     write_special_table(special_rows, out_dir / "未能匹配的专业.xlsx")
 
@@ -727,6 +746,98 @@ def run(
     }
 
 
+def add_source_files_args(parser: argparse.ArgumentParser) -> None:
+    """注册数据源 CLI 参数（文件名 / 一段线 / 补充表 / 提前批）。
+
+    ``run_pipeline.main`` 与 ``run_stage_verify_prep.main`` 共用这一组参数 +
+    :func:`parse_source_files_args`，单一真理源——避免两入口 drift（BUG-2:
+    verify_prep 曾不转发任何 source_files 参数，导致提前批线差用错默认）。
+    """
+    parser.add_argument("--dl-file", default=None, help="大绿本文件名（覆盖默认）")
+    parser.add_argument(
+        "--j3-file", default=None, help="近三年统计表文件名（覆盖默认）"
+    )
+    parser.add_argument(
+        "--tq-file",
+        default=None,
+        help="提前批补充表文件名（覆盖默认；不存在则跳过）",
+    )
+    parser.add_argument(
+        "--one-line",
+        default=None,
+        help="一段线，格式「年份=分数」逗号分隔，如「2023=443,2024=444,2025=441」"
+        "（覆盖内置默认 constants.ONE_LINE）",
+    )
+    parser.add_argument(
+        "--supplement-batches",
+        default=None,
+        help="补充表批次名，逗号分隔（如 本科提前批A类,本科提前批B类）",
+    )
+    parser.add_argument(
+        "--supplement-low-cols",
+        default=None,
+        help="补充表低分列，格式「2025=10,2024=14,2023=18」（0 开始数）",
+    )
+    parser.add_argument(
+        "--dagluben-early-batches",
+        default=None,
+        help="大绿本提前批的批次名，逗号分隔（默认 1.提前批A类,2.提前批B类,3.提前批—飞行技术(军队)）",
+    )
+    parser.add_argument(
+        "--flight-batch",
+        default=None,
+        help="飞行技术批次名（默认 3.提前批—飞行技术(军队)）",
+    )
+
+
+def parse_source_files_args(args: argparse.Namespace) -> dict[str, object]:
+    """把 :func:`add_source_files_args` 注册的参数解析成 ``run()`` 的关键字参数。
+
+    Returns a dict suitable for ``run(..., **<this>)``: source_files / one_line
+    / supplement_batches / supplement_low_cols / dagluben_early_batches /
+    flight_batch. ``None`` values fall through to ``run()``'s defaults.
+    """
+    source_files: dict[str, str] | None = None
+    if args.dl_file or args.j3_file or args.tq_file:
+        source_files = dict(SOURCE_FILES)
+        if args.dl_file:
+            source_files["dl"] = args.dl_file
+        if args.j3_file:
+            source_files["j3"] = args.j3_file
+        if args.tq_file:
+            source_files["tq"] = args.tq_file
+    one_line: dict[int, int] | None = None
+    if args.one_line:
+        one_line = {}
+        for pair in args.one_line.split(","):
+            year, val = pair.split("=")
+            one_line[int(year)] = int(val)
+    supplement_batches = (
+        frozenset(args.supplement_batches.split(","))
+        if args.supplement_batches
+        else None
+    )
+    supplement_low_cols: dict[int, int] | None = None
+    if args.supplement_low_cols:
+        supplement_low_cols = {}
+        for pair in args.supplement_low_cols.split(","):
+            year, col = pair.split("=")
+            supplement_low_cols[int(year)] = int(col)
+    dagluben_early_batches = (
+        frozenset(args.dagluben_early_batches.split(","))
+        if args.dagluben_early_batches
+        else None
+    )
+    return {
+        "source_files": source_files,
+        "one_line": one_line,
+        "supplement_batches": supplement_batches,
+        "supplement_low_cols": supplement_low_cols,
+        "dagluben_early_batches": dagluben_early_batches,
+        "flight_batch": args.flight_batch,
+    }
+
+
 def main() -> None:
     """CLI entry: run the deterministic chain over the real data dir."""
     parser = argparse.ArgumentParser(
@@ -769,75 +880,13 @@ def main() -> None:
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    parser.add_argument("--dl-file", default=None, help="大绿本文件名（覆盖默认）")
-    parser.add_argument(
-        "--j3-file", default=None, help="近三年统计表文件名（覆盖默认）"
-    )
-    parser.add_argument(
-        "--tq-file",
-        default=None,
-        help="提前批补充表文件名（覆盖默认；不存在则跳过）",
-    )
-    parser.add_argument(
-        "--one-line",
-        default=None,
-        help="一段线，格式「2025=443,2024=444,2023=441」（覆盖默认）",
-    )
-    parser.add_argument(
-        "--supplement-batches",
-        default=None,
-        help="补充表批次名，逗号分隔（如 本科提前批A类,本科提前批B类）",
-    )
-    parser.add_argument(
-        "--supplement-low-cols",
-        default=None,
-        help="补充表低分列，格式「2025=10,2024=14,2023=18」（0 开始数）",
-    )
-    parser.add_argument(
-        "--dagluben-early-batches",
-        default=None,
-        help="大绿本提前批的批次名，逗号分隔（默认 1.提前批A类,2.提前批B类,3.提前批—飞行技术(军队)）",
-    )
-    parser.add_argument(
-        "--flight-batch",
-        default=None,
-        help="飞行技术批次名（默认 3.提前批—飞行技术(军队)）",
-    )
+    add_source_files_args(parser)
     args = parser.parse_args()
 
     # CLI 参数化：文件名 + 一段线（覆盖模块默认，agent 传参不手写代码）。
-    source_files = None
-    if args.dl_file or args.j3_file or args.tq_file:
-        source_files = dict(SOURCE_FILES)
-        if args.dl_file:
-            source_files["dl"] = args.dl_file
-        if args.j3_file:
-            source_files["j3"] = args.j3_file
-        if args.tq_file:
-            source_files["tq"] = args.tq_file
-    one_line = None
-    if args.one_line:
-        one_line = {}
-        for pair in args.one_line.split(","):
-            year, val = pair.split("=")
-            one_line[int(year)] = int(val)
-    supplement_batches = (
-        frozenset(args.supplement_batches.split(","))
-        if args.supplement_batches
-        else None
-    )
-    supplement_low_cols = None
-    if args.supplement_low_cols:
-        supplement_low_cols = {}
-        for pair in args.supplement_low_cols.split(","):
-            year, col = pair.split("=")
-            supplement_low_cols[int(year)] = int(col)
-    dagluben_early_batches = (
-        frozenset(args.dagluben_early_batches.split(","))
-        if args.dagluben_early_batches
-        else None
-    )
-    flight_batch = args.flight_batch
+    # 解析逻辑与 run_stage_verify_prep 共用 add_source_files_args /
+    # parse_source_files_args，避免两入口 drift（BUG-2: verify_prep 曾不转发）。
+    _source_kwargs = parse_source_files_args(args)
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -850,12 +899,7 @@ def main() -> None:
         with_agent_results=args.with_agent_results,
         semantic_dir=args.semantic_dir,
         intermediate_dir=args.intermediate_dir,
-        source_files=source_files,
-        one_line=one_line,
-        supplement_batches=supplement_batches,
-        supplement_low_cols=supplement_low_cols,
-        dagluben_early_batches=dagluben_early_batches,
-        flight_batch=flight_batch,
+        **_source_kwargs,
     )
 
     cov = report["coverage"]

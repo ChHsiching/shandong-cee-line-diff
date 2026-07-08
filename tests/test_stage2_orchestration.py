@@ -190,6 +190,25 @@ def test_write_prompts_preserves_item_order_and_indices(tmp_path: Path) -> None:
     assert [it["src_row_idx"] for it in b2["items"]] == [30]
 
 
+def test_write_prompts_embeds_cardinality_matching_rule(tmp_path: Path) -> None:
+    """每个 batch prompt 内联基数规则（单一真理源 = SKILL §3），让 subagent
+    不必再翻 SKILL.md。drift guard：培养模式标签 + 一对多/多对一 + 中外合作
+    必须都在——曾因缺这条规则，subagent 各自重读 SKILL 还把培养模式判错。"""
+    batches = build_batches(
+        [_dl("甲大学", "数学(拔尖)", "数学", 1)],
+        [_hist("甲大学", "数学", "数学", 80.0)],
+        batch_size=20,
+    )
+    paths = write_prompts(batches, tmp_path)
+    payload = json.loads(paths[0].read_text(encoding="utf-8"))
+    assert "matching_rule" in payload
+    rule = payload["matching_rule"]
+    assert any(tok in rule for tok in ("培养模式", "拔尖"))
+    assert "一对多" in rule
+    assert any(tok in rule for tok in ("多对一", "多对1"))
+    assert "中外合作" in rule
+
+
 # ---------------------------------------------------------------------------
 # apply_results
 # ---------------------------------------------------------------------------

@@ -178,4 +178,6 @@ def test_write_special_table(tmp_path: Path) -> None:
     out = tmp_path / "未能匹配的专业.xlsx"
     write_special_table(rows, out)
     data = _load(out)
-    assert "飞行" in data[1][7]
+    # 原因说明 现在是最后一列（前面插了 4 列估算）——按表头定位，不硬编码下标。
+    log_idx = data[0].index("原因说明")
+    assert "飞行" in data[1][log_idx]

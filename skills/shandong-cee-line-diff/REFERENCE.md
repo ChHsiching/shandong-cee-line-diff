@@ -140,7 +140,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 1. **第一次跑管线**（写出 batch prompt + 改名候选，不 apply）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match`
    → 严格匹配 + **无改名的** Stage2 batch prompt（改名校这时空候选，正常）+ 改名候选。
-2. **派 agent 跑改名配对**（先于语义！）：读 `semantic-match/rename_prompt.md` + `rename_candidates.jsonl`，派 subagent 网查每所消失/新增校，结果写 `semantic-match/rename_result.jsonl`（每行 `{new_school, old_school, confidence, is_rename}`）；网查详情写 `research/<校名>.md`。
+2. **派 agent 跑改名配对**（先于语义！）：读 `semantic-match/rename_prompt.md` + `rename_candidates.jsonl`，派 subagent 网查每所消失/新增校，结果写 `semantic-match/rename_result.jsonl`（每行 `{new_school, old_school, confidence, is_rename, note}`——`note` 可选，is_rename=true 时填「结论 + 官方链接 moe.gov.cn/gov.cn/.edu.cn」，直接进改名表备注列）；网查详情写 `research/<新校名>.md`（每校一个）。
 3. **第二次跑管线**（apply 改名 → 重生成改名感知 batch）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → 旧校名 history 并入新校名，**改名校的专业这次有候选了**，Stage2 batch prompt 重新生成（改名感知）。

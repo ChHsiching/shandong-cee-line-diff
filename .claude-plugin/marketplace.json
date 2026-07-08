@@ -3,14 +3,14 @@
   "owner": { "name": "ChHsiching" },
   "metadata": {
     "description": "山东高考录取数据匹配整理 skill（大绿本 × 近三年线差）",
-    "version": "1.2.2"
+    "version": "1.3.0"
   },
   "plugins": [
     {
       "name": "shandong-cee-line-diff",
       "source": "./",
       "description": "山东高考大绿本招生计划 × 近三年录取线差 → 按专业匹配整理成带线差/标准差的表（主表+边界表）。",
-      "version": "1.2.2",
+      "version": "1.3.0",
       "author": { "name": "ChHsiching" },
       "homepage": "https://github.com/ChHsiching/shandong-cee-line-diff",
       "repository": "https://github.com/ChHsiching/shandong-cee-line-diff",

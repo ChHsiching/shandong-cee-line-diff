@@ -359,6 +359,68 @@ def test_apply_verify_rejects_bad_json_line(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# requirement text — rule content (single source of truth, drift guard)
+# ---------------------------------------------------------------------------
+# verify 判定规则只在 _requirement_text（按往年同核心数动态生成），OUTPUT_SCHEMA
+# 只指回这里——避免两处复述 drift。曾因此把培养模式标签丢掉，verify 把
+# 数学(拔尖)↔数学 判了存疑（handoff 2026-07-08）。规则与 SKILL §3 一致：
+#   past=1 (一对多) → 今年任何校内变体(培养模式/合作/方向/性别)都是同一专业→确定
+#   past>1         → 培养模式标签差异→确定；中外合作/师范/类别/真方向→存疑
+
+def test_requirement_past_one_absorbs_all_variants() -> None:
+    """past=1：培养模式标签 + 中外合作/方向/性别 都判确定（一对多）。drift guard。"""
+    from scripts.verify_judgment import _requirement_text
+
+    req = _requirement_text(
+        _dl(1, "甲大学", "数学(拔尖)", "数学"),
+        _hist("甲大学", "数学", "数学"),
+        past_same_core=1,
+    )
+    assert any(l in req for l in ("培养模式", "拔尖", "卓越", "创新", "试验班"))
+    assert "中外合作" in req  # past=1 连合作都吸收
+    assert "确定" in req
+
+
+def test_requirement_past_many_training_mode_ok_but_category_doubt() -> None:
+    """past>1：培养模式标签→确定；但中外合作/师范/类别→存疑。"""
+    from scripts.verify_judgment import _requirement_text
+
+    req = _requirement_text(
+        _dl(1, "甲大学", "数学(拔尖)", "数学"),
+        _hist("甲大学", "数学", "数学"),
+        past_same_core=3,
+    )
+    assert any(l in req for l in ("培养模式", "拔尖", "卓越", "创新", "试验班"))
+    assert "中外合作" in req
+    assert "存疑" in req
+
+
+def test_build_verify_batches_routes_by_past_same_core_count() -> None:
+    """build_verify_batches 按往年同核心数选 regime：1 个→一对多确定, 多个→细比。"""
+    judgment = [_match(1, "甲大学", "数学(拔尖)", log="agent 语义匹配：方向对齐")]
+    dagluben = [_dl(1, "甲大学", "数学(拔尖)", "数学")]
+    # 往年同核心 3 个 → past>1 regime（中外合作应判存疑，不是被吸收）
+    history = [_hist("甲大学", f"数学({x})", "数学") for x in ("普通", "拔尖", "中外合作")]
+    batches = build_verify_batches(judgment, dagluben, history, batch_size=20)
+    req = batches[0].items[0].requirement
+    assert "中外合作" in req and "存疑" in req
+
+    # 对比：往年同核心只 1 个 → past=1 regime（中外合作被吸收→确定）
+    history_one = [_hist("甲大学", "数学", "数学")]
+    batches_one = build_verify_batches(judgment, dagluben, history_one, batch_size=20)
+    req_one = batches_one[0].items[0].requirement
+    assert "确定" in req_one
+
+
+def test_output_schema_description_defers_to_requirement() -> None:
+    """OUTPUT_SCHEMA 不再复述规则（单一真理源），只指回每条 item 的 requirement。"""
+    from scripts.verify_judgment import OUTPUT_SCHEMA
+
+    desc = OUTPUT_SCHEMA["description"]
+    assert "requirement" in desc.lower()
+
+
+# ---------------------------------------------------------------------------
 # golden regression (manual — after agent dispatch)
 # ---------------------------------------------------------------------------
 

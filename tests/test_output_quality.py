@@ -224,7 +224,10 @@ def test_write_deleted_major_table_maps_fields_to_columns(tmp_path: Path) -> Non
 
 
 def test_write_special_table_maps_fields_to_columns(tmp_path: Path) -> None:
-    """Regression (same class): EdgeRow field names must map to 特殊情况 header."""
+    """Regression (same class): EdgeRow field names must map to 特殊情况 header.
+
+    Task 3: 「对不上」行带 4 列估算（统计线差估算/线差标准差估算/估算方式/
+    用了几条往年数据），插在 原因说明 前——飞行行这几列留空。"""
     from scripts.write_edge_tables import write_special_table
 
     rows = [
@@ -237,15 +240,40 @@ def test_write_special_table_maps_fields_to_columns(tmp_path: Path) -> None:
             "subject": "物理和化学",
             "batch": "提前批",
             "log": "飞行技术(军队)，提前批池匹配不成",
-        }
+        },
+        {
+            "src_row_idx": 8,
+            "school": "甲大学",
+            "school_cat": "",
+            "major": "工科试验班类",
+            "core": "工科试验班类",
+            "subject": "物理和化学",
+            "batch": "4.常规批",
+            "log": "没找到能匹配的往年专业：工科试验班类",
+            "est_value": 82.5,
+            "est_t": 3.2,
+            "est_level": 0,
+            "est_n": 12,
+        },
     ]
     out = tmp_path / "特.xlsx"
     write_special_table(rows, out)
     data = _load_xlsx(out)
-    assert data[1][0] == 7
-    assert data[1][1] == "飞大"
-    assert data[1][3] == "飞行技术"
-    assert data[1][7] == "飞行技术(军队)，提前批池匹配不成"
+    header = data[0]
+    assert "统计线差估算" in header
+    assert "估算方式" in header
+    assert header[-1] == "原因说明"
+    j_idx = header.index("统计线差估算")
+    log_idx = header.index("原因说明")
+    way_idx = header.index("估算方式")
+
+    flight = next(r for r in data[1:] if r[0] == 7)
+    assert flight[log_idx] == "飞行技术(军队)，提前批池匹配不成"
+    assert flight[j_idx] in (None, "")  # 飞行行不估
+
+    other = next(r for r in data[1:] if r[0] == 8)
+    assert other[j_idx] == 82.5
+    assert other[way_idx] == "同校同选科均值"
 
 
 # ---------------------------------------------------------------------------

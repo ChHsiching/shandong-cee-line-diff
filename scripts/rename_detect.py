@@ -63,7 +63,9 @@ OUTPUT_SCHEMA: dict[str, object] = {
         " new_school(大绿本校名,逐字等于候选 new_school),"
         " old_school(从候选 candidate_old_schools 中选取,或 null 若无),"
         " confidence(agent 语义置信度,∈[0,1]),"
-        " is_rename(true=确认构成改名/转设,false=候选不构成改名)。"
+        " is_rename(true=确认构成改名/转设,false=候选不构成改名),"
+        " note(可选;is_rename=true 时强烈建议填:一句话结论 + 官方来源链接"
+        " moe.gov.cn/gov.cn/.edu.cn,直接进改名表备注列)。"
         " 每个 (new_school, old_school) 对至多一行；合并情形一个"
         " new_school 可多行(每行一个 old_school)。"
     ),
@@ -103,6 +105,9 @@ RENAME_PROMPT_TEXT = """\
    转设/合并**? 如是, 选出构成改名的 old_school（合并情形可能多个,每个输出一行）; 若候选均不构成, 选 null。
 3. 给出 `confidence` ∈ [0,1] 的语义置信度(非字符串相似度)。
 4. `is_rename`: true=确认改名/转设; false=候选不构成改名(该校可能是真新增校)。
+5. is_rename=true 的: 填 `note` = 一句话结论 + **官方来源链接**(教育部
+   moe.gov.cn / 省政府 gov.cn / 学校 .edu.cn，**不认**百科/新闻)。这条 note
+   会直接进改名表的备注列——是用户看到改名依据的唯一入口，务必填。
 
 ## 输出 schema (逐行写入 `semantic-match/rename_result.jsonl`)
 
@@ -110,17 +115,18 @@ RENAME_PROMPT_TEXT = """\
 {"new_school": "<逐字等于输入的 new_school>",
  "old_school": "<来自 candidate_old_schools, 或 null>",
  "confidence": <0.0-1.0>,
- "is_rename": <true|false>}
+ "is_rename": <true|false>,
+ "note": "<可选: 结论 + 官方链接, is_rename=true 时强烈建议填>"}
 ```
 
 ## 硬约束 (违反将使整批被拒绝)
 
 - **禁止**仅凭字符串相似度/编辑距离判断 — 须有语义理由(可记于内部思考,
-  最终 jsonl 只需四字段)。
+  最终 jsonl 必需四字段: new_school/old_school/confidence/is_rename)。
 - `old_school` 必须逐字来自 `candidate_old_schools` 或为 `null`。
 - `confidence` 严格 ∈ [0,1] (越界整批拒)。
 - 每个 (new_school, old_school) 对至多一行；合并情形一个 new_school 输出多行（每行一个 old_school）。
-- 字段缺一不可。
+- 必需字段缺一不可（`note` 可选）。
 """
 
 
@@ -377,6 +383,11 @@ def apply_rename(
                     f"old_school={old_school!r}) 重复出现(每对至多一行)"
                 )
             seen.add(pair)
+            # 可选 note（结论 + 官方链接）直接进备注列——agent 在 jsonl 里填好，
+            # 改名表备注就有依据，不依赖 research/<校名>.md 的文件命名约定
+            # （BUG-4: 曾因 agent 写 chunk 文件、代码找 per-school 文件，备注全空）。
+            note_raw = obj.get("note", "")
+            note = note_raw.strip() if isinstance(note_raw, str) else ""
             rename_table.append(
                 RenameRow(
                     new_school=new_school,
@@ -384,7 +395,7 @@ def apply_rename(
                     confidence=conf,
                     is_rename=True,
                     major_count_2026=major_count.get(new_school, 0),
-                    remark="",
+                    remark=note,
                     manual_reviewed=False,
                 )
             )

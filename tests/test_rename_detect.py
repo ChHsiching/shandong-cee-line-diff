@@ -320,3 +320,41 @@ def test_apply_rename_empty_input_returns_empty(
     rename_table, confirmed = apply_rename([empty], [], [])
     assert rename_table == []
     assert confirmed == set()
+
+
+def test_apply_rename_note_fills_remark(tmp_path: Path) -> None:
+    """BUG-4: 可选 note（结论 + 官方链接）直接进改名表备注列，不依赖
+    research/<校名>.md 文件命名（曾因 agent 写 chunk 文件、备注全空）。"""
+    jsonl = _make_jsonl(
+        tmp_path,
+        "rename_result.jsonl",
+        [
+            {
+                "new_school": "新大学甲",
+                "old_school": "旧大学甲",
+                "confidence": 0.9,
+                "is_rename": True,
+                "note": "教育部批准更名 来源：moe.gov.cn/xxx",
+            },
+            {
+                "new_school": "新大学乙",
+                "old_school": "旧大学乙",
+                "confidence": 0.8,
+                "is_rename": True,
+                # 无 note → remark 留空（由 _enrich_rename_rows 回退 research 扫描）
+            },
+        ],
+    )
+    dgl_rows = [
+        DaglubenRow(school="新大学甲", major="计算机", src_row_idx=1),
+        DaglubenRow(school="新大学乙", major="数学", src_row_idx=2),
+    ]
+    hist_rows = [
+        HistoryRow(school="旧大学甲", major="计算机"),
+        HistoryRow(school="旧大学乙", major="数学"),
+    ]
+
+    rename_table, _ = apply_rename([jsonl], dgl_rows, hist_rows)
+    by_new = {r["new_school"]: r for r in rename_table}
+    assert "moe.gov.cn" in by_new["新大学甲"]["remark"]
+    assert by_new["新大学乙"]["remark"] == ""

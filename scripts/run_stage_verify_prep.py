@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 
 from scripts.constants import LOG_COARSE_CANDIDATE, LOG_SEMANTIC_PREFIX
-from scripts.run_pipeline import run
+from scripts.run_pipeline import add_source_files_args, parse_source_files_args, run
 from scripts.verify_judgment import build_verify_batches, write_verify_prompts
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,9 @@ def main() -> int:
         help="Do not apply batch_*_result.jsonl when extracting judgmental "
         "matches (use the strict+coarse-only口径).",
     )
+    # 与 run_pipeline 同一组数据源参数（BUG-2: 此前一个都不转发，导致 verify
+    # prep 用默认一段线/文件名，与最终产出不一致）。
+    add_source_files_args(parser)
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -68,6 +71,7 @@ def main() -> int:
         args.out_dir,
         with_agent_results=not args.no_agent_results,
         semantic_dir=args.semantic_dir,
+        **parse_source_files_args(args),
     )
 
     main_results = report["main_results"]
