@@ -395,6 +395,24 @@ def test_requirement_past_many_training_mode_ok_but_category_doubt() -> None:
     assert "存疑" in req
 
 
+def test_requirement_covers_dalei_vs_specific_exception() -> None:
+    """Def-3（fresh-test 2026-07-09）：verify requirement 必须覆盖「大类↔具体」
+    例外——不然 cores 不同(工商管理 vs 工商管理类)时落到「真方向不同→存疑」，
+    把有效的 X↔X类 一对多匹配误降级（~30-50 条）。drift guard。"""
+    from scripts.verify_judgment import _requirement_text
+
+    for past_n in (1, 3):
+        req = _requirement_text(
+            _dl(1, "甲大学", "工商管理", "工商管理"),
+            _hist("甲大学", "工商管理类", "工商管理类"),
+            past_same_core=past_n,
+        )
+        assert any(
+            tok in req for tok in ("大类↔具体", "X类", "工商管理类")
+        ), f"past={past_n} requirement 缺大类↔具体例外"
+        assert "确定" in req
+
+
 def test_build_verify_batches_routes_by_past_same_core_count() -> None:
     """build_verify_batches 按往年同核心数选 regime：1 个→一对多确定, 多个→细比。"""
     judgment = [_match(1, "甲大学", "数学(拔尖)", log="agent 语义匹配：方向对齐")]

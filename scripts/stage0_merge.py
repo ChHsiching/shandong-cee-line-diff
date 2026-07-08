@@ -42,7 +42,7 @@ from scripts.constants import (
     TQ_LOW_2023,
     TQ_LOW_2024,
     TQ_LOW_2025,
-    ZHUANKE_KEYWORD,
+    ZHUANKE_KEYWORDS,
 )
 from scripts.line_diff import compute as compute_line_diff
 from scripts.models import DaglubenRow, HistoryRow
@@ -74,7 +74,15 @@ def _is_header(row: Sequence) -> bool:
 
 
 def _looks_zhuanke(*values) -> bool:
-    return any(v is not None and ZHUANKE_KEYWORD in str(v) for v in values)
+    """True if any value carries a专科 marker keyword (专科 / 军士生 / 定向培养军士).
+
+    军士生 = 高职专科层（定向培养军士），bracket 常写「定向培养军士生,与xx联合
+    培养」不含「专科」字样——只查「专科」会漏（Def-2 实测 46 条泄漏）。
+    """
+    return any(
+        v is not None and any(kw in str(v) for kw in ZHUANKE_KEYWORDS)
+        for v in values
+    )
 
 
 def _to_float(v) -> float | None:
@@ -100,8 +108,12 @@ def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
         batch = _cell(row, J3_BATCH)
         if batch not in (J3_BATCH_REGULAR, J3_BATCH_EARLY):
             continue
-        # Drop rows that carry the专科 keyword in remarks or bracket content.
-        if _looks_zhuanke(_cell(row, J3_REMARKS), _cell(row, J3_BRACKET)):
+        # Drop rows that carry a专科 marker (专科 / 军士生 / 定向培养军士) in
+        # remarks / bracket / major. 军士生标记常在 bracket + major，不在 remarks
+        # （Def-2：定向培养军士生专科行曾漏进本科池）。
+        if _looks_zhuanke(
+            _cell(row, J3_REMARKS), _cell(row, J3_BRACKET), _cell(row, J3_MAJORNAME)
+        ):
             continue
 
         school_raw = _cell(row, J3_SCHOOLNAME) or ""

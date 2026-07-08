@@ -196,6 +196,30 @@ def test_build_history_regular_excludes_zhuanke_subtitle_via_remarks():
     assert out[0]["school"] == "A大学"
 
 
+def test_build_history_regular_excludes_junshizhuanke_early_rows():
+    """Def-2（fresh-test 2026-07-09 真实数据）：提前批「定向培养军士生」专科行
+    （威海职业/滨州职业等专科校，bracket=「定向培养军士生,与xx联合培养」、
+    remarks 空、线差为负）曾漏进本科池——_looks_zhuanke 只查「专科」漏掉了它。
+    污染改名候选（专科校成历史独有校）+ 潜在线差错配。必须排除。"""
+    rows = _j3_rows(
+        [
+            (
+                "提前批", "D1", "威海职业学院", "现代通信技术", "物理", "",
+                "现代通信技术", "是", "定向培养军士生，与武警部队联合培养",
+                -2.0, -2, -2, -2,
+            ),
+            (
+                "提前批", "D2", "A大学", "数学", "物理", "",
+                "数学", "否", "", 80.0, 80, 80, 80,
+            ),
+        ]
+    )
+    out = stage0_merge.build_history_regular(rows)
+    # 军士生专科行排除，本科行保留
+    assert len(out) == 1
+    assert out[0]["school"] == "A大学"
+
+
 # --- build_dagluben_regular (pure function, RED) ---------------------------
 
 
@@ -788,7 +812,7 @@ class TestStage0Smoke:
         finally:
             wb.close()
         built = stage0_merge.build_history_regular(rows)
-        assert len(built) == 29093  # 常规批一段 28269 + J3 提前批 824（现成线差，用）
+        assert len(built) == 29048  # 常规批一段 28269 + J3 提前批 779（已排除 45 条定向培养军士生专科行，Def-2）
 
     def test_smoke_dagluben_regular_major_row_count(self, repo_root: Path):
         from scripts import io_source

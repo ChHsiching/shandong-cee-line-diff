@@ -54,6 +54,11 @@ TQ_BATCH_EARLY_B = "本科提前批B类"
 TQ_BATCH_EARLY = "提前批"
 
 # --- 专科 exclusion ----------------------------------------------------------
+# 识别专科行的关键字集合。「定向培养军士生」是高职专科层（2 年制军士 NCO 训练），
+# 实测 46 条军士生提前批行（威海/滨州职业等专科校）曾因 bracket 只写「军士生」、
+# 不含「专科」而漏进本科池（Def-2，fresh-test 2026-07-09）。
+ZHUANKE_KEYWORDS: tuple[str, ...] = ("专科", "军士生", "定向培养军士")
+# Backward-compat alias（旧名只查「专科」，新代码用 ZHUANKE_KEYWORDS 集合）。
 ZHUANKE_KEYWORD = "专科"
 
 # --- 招生类别 keywords stripped from school names ----------------------------

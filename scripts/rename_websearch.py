@@ -3,7 +3,8 @@
 Per Plan v2 binding + spec §6 Stage 3 最后一步 + Slice 4 architecture:
 WebSearch **cannot be invoked from a Python script** (harness tool), so this
 module ships only the testable pure functions. The harness runs the per-school
-WebSearch loop against the改名表 (see ``research/RUN_RENAME.md``) and feeds
+WebSearch loop against the改名表 (see ``semantic-match/rename_prompt.md`` +
+REFERENCE「管线串联命令」第 2 步) and feeds
 each ``research/<school>.md`` summary through :func:`merge_remark`.
 
 Idempotency (Plan v2 binding): the改名表 备注 column carries a

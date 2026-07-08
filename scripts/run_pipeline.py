@@ -210,7 +210,7 @@ def _apply_rename(
 
     logger.info(
         "改名: 未发现 rename_result.jsonl（候选 %d 所）；改名 待 harness 派发"
-        "（见 research/RUN_RENAME.md）",
+        "（见 semantic-match/rename_prompt.md 或 REFERENCE「管线串联命令」第 2 步）",
         len(candidates),
     )
     return [], set(), False
@@ -960,7 +960,7 @@ def main() -> None:
         print("    见 semantic-match/RUN.md）。匹配置为严格匹配口径。")
     if not report["rename_applied"]:
         print("注: 未应用改名 agent 结果（改名配对待 harness 派发，")
-        print("    见 research/RUN_RENAME.md）。被删/新增校为上界。")
+        print("    见 semantic-match/rename_prompt.md / REFERENCE 第 2 步）。被删/新增校为上界。")
 
 
 if __name__ == "__main__":
