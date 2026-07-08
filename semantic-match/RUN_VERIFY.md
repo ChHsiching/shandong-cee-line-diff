@@ -26,7 +26,7 @@
 
 ## STEP 2 — harness 侧派发复核 agent
 
-对每个 `verify_batch_NN.json`，派发一个 `Agent(general-purpose)`，prompt 用 `semantic-match/verify_prompt.md`（任务+输出 schema），输入即该 batch 文件内容，输出写到 `semantic-match/verify_batch_NN_result.jsonl`。
+对每个 `verify_batch_NN.json`，派发一个 `Agent(general-purpose)`，让子代理读该文件本身——里面自带 `output_schema` + 每条 item 的 `requirement`（按往年同核心数动态生成的判定规则：past=1→一对多全确定，past>1→培养模式标签确定/中外合作·师范·类别·真方向存疑）。要求 agent 按每条 item 的 `requirement` 判「确定」/「存疑」，输出写到 `semantic-match/verify_batch_NN_result.jsonl`。**不要另写规则文档**——规则就在每条 item 的 `requirement` 里。
 
 并行模式同 Stage2 语义匹配（见 `semantic-match/RUN.md`）。
 
