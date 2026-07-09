@@ -110,11 +110,14 @@ def main() -> int:
 def _is_judgmental(match: dict) -> bool:
     """Inline V5-0 judgmental filter (mirrors verify_judgment.is_judgmental
     but operates on the dict-shaped main_results row to avoid a cross-module
-    dependency in this exempt orchestration script)."""
+    dependency in this exempt orchestration script).
+
+    只算 agent 语义匹配（LOG_SEMANTIC_PREFIX）。Stage 1.5 past=1 粗筛匹配
+    （LOG_COARSE_CANDIDATE）是构造确定（往年同核心只 1 个→直接配），豁免复核。"""
     if not match.get("matched"):
         return False
     log = match.get("log", "")
-    return log.startswith(LOG_COARSE_CANDIDATE) or log.startswith(LOG_SEMANTIC_PREFIX)
+    return log.startswith(LOG_SEMANTIC_PREFIX)
 
 
 if __name__ == "__main__":

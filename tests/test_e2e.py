@@ -451,13 +451,15 @@ def test_classification_counts_on_fixture(fixture_workbooks, tmp_path):
     xc_row = next(r for r in report["new_major_rows"] if r.get("school") == "新校")
     assert xc_row["level"] == 2
 
-    # 飞行技术(军队) at 军航大学 → special; 数学类(拔尖) → special (coarse 已停用,
-    # with_agent_results=False 时 Stage 2 未 apply).
+    # 数学类(拔尖) + 飞行技术(军队) 现在 coarse past=1 配上（往年同核心只 1 个 →
+    # 一对多直接配；军航飞行技术(军队)↔往年飞行技术(地方专项) 走跨类别回退）→ 进主表。
+    assert ("示例大学", "数学类(拔尖)") in matched_schools_major
+    assert ("军航大学", "飞行技术(军队)") in matched_schools_major
     special_pairs = {
         (r.get("school"), r.get("major")) for r in report["edge"]["special"]
     }
-    assert ("军航大学", "飞行技术(军队)") in special_pairs
-    assert ("示例大学", "数学类(拔尖)") in special_pairs
+    assert ("示例大学", "数学类(拔尖)") not in special_pairs
+    assert ("军航大学", "飞行技术(军队)") not in special_pairs
 
     # Coverage report keys exist and sum correctly.
     cov = report["coverage"]

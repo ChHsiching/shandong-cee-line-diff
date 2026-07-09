@@ -36,9 +36,11 @@ from scripts.constants import (
 from scripts.models import DaglubenRow, HistoryRow, MatchResult
 from scripts.normalize import diff_brackets
 from scripts.stage1_strict import normalise_cat, single_year_note
+from scripts.stage2_agent import _core_compatible
 
 __all__ = [
     "build_core_idx",
+    "build_core_school_idx",
     "match_coarse",
     "LOG_MISS",
 ]
@@ -65,6 +67,21 @@ def build_core_idx(history: Iterable[HistoryRow]) -> CoreIndex:
             h.get("core", ""),
         )
         idx.setdefault(key, []).append(h)
+    return idx
+
+
+def build_core_school_idx(history: Iterable[HistoryRow]) -> dict[str, list[HistoryRow]]:
+    """Bucket history rows by ``school`` only (ignoring 招生类别 + core).
+
+    Used by :func:`match_coarse` as a **跨类别回退**：当同校同类别同核心一个候选
+    都没有时（今年普通、往年只招过中外合作 school-level），退到同校、用
+    :func:`scripts.stage2_agent._core_compatible` 找核心兼容的——让「名头变了的
+    往年专业」也能被 past=1 配上（用户口径 2026-07-09：往年只有一个，无论什么
+    方向/名头，今年直接用它的分）。
+    """
+    idx: dict[str, list[HistoryRow]] = {}
+    for h in history:
+        idx.setdefault(h.get("school", ""), []).append(h)
     return idx
 
 
@@ -138,6 +155,7 @@ def _accept(dagluben: DaglubenRow, candidate: HistoryRow, base_log: str) -> Matc
 def match_coarse(
     unmatched: Iterable[DaglubenRow],
     core_idx: CoreIndex,
+    core_school_idx: dict[str, list[HistoryRow]] | None = None,
 ) -> tuple[list[MatchResult], list[DaglubenRow]]:
     """Run the Stage 1.5 coarse matcher over Stage 1's unmatched rows.
 
@@ -153,28 +171,31 @@ def match_coarse(
     """
     accepted: list[MatchResult] = []
     still: list[DaglubenRow] = []
+    school_idx = core_school_idx or {}
 
     for d in unmatched:
-        key = _dagluben_core_key(d)
-        candidates = core_idx.get(key)
-        if not candidates:
-            still.append(d)
+        # 1) 同校同类别同核心
+        same_cat = core_idx.get(_dagluben_core_key(d), [])
+        if len(same_cat) == 1:
+            accepted.append(_accept(d, same_cat[0], LOG_COARSE_CANDIDATE))
             continue
 
-        if len(candidates) == 1:
-            accepted.append(_accept(d, candidates[0], LOG_COARSE_CANDIDATE))
-            continue
-
-        # Multi-candidate: keep only those whose differentiated brackets are
-        # all substrings of the大绿本 major全名.
-        dl_major = d.get("major", "")
-        compatible = [
-            c for c in candidates if _brackets_subset_of(c.get("major", ""), dl_major)
+        # 2) 跨类别回退：同校、任意类别、核心兼容（精确或 X↔X类）——让「今年普通、
+        #    往年只招过中外合作(校名级)」这种也能 past=1 配上（用户口径：往年只有
+        #    一个、无论什么名头/方向，今年直接用它的分）。
+        dl_core = d.get("core", "")
+        any_cat = [
+            h
+            for h in school_idx.get(d.get("school", ""), [])
+            if _core_compatible(dl_core, h.get("core", ""))
         ]
-        if len(compatible) == 1:
-            accepted.append(_accept(d, compatible[0], _disambig_log(compatible[0])))
-        else:
-            # Zero compatible or >=2 compatible -> ambiguous -> Stage 2.
-            still.append(d)
+        if len(any_cat) == 1:
+            accepted.append(
+                _accept(d, any_cat[0], LOG_COARSE_CANDIDATE + "（跨类别一对多）")
+            )
+            continue
+
+        # 0 或 2+ → Stage 2 agent（旧 multi-candidate bracket-subset 消歧已停用）
+        still.append(d)
 
     return accepted, still

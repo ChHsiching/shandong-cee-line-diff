@@ -62,6 +62,18 @@ def _hist(school: str, major: str, core: str, j: float, cat: str = "") -> Histor
     )
 
 
+def test_core_compatible_only_dalei_vs_specific() -> None:
+    """§5.3：子串兼容只留 X↔X类（大类↔具体）；化学↔化学工程与工艺 不算（不同专业）。"""
+    from scripts.stage2_agent import _core_compatible
+
+    assert _core_compatible("化学", "化学") is True  # exact
+    assert _core_compatible("经济学", "经济学类") is True  # X↔X类
+    assert _core_compatible("数学类", "数学") is True  # 双向
+    assert _core_compatible("化学", "化学工程与工艺") is False  # 子串但不同专业
+    assert _core_compatible("中药学", "药学") is False
+    assert _core_compatible("药学", "药学类") is True  # X↔X类
+
+
 def test_build_batches_groups_by_school_and_attaches_candidates() -> None:
     """3 unmatched rows across 2 schools split into batches of 2.
 

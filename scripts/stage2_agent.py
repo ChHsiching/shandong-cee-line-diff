@@ -68,21 +68,20 @@ OUTPUT_SCHEMA: dict[str, object] = {
 # 保持一致）。每个 batch prompt 内联一份，让被派发的 subagent 不必再翻 SKILL.md
 # —— 曾因 prompt 里没规则，subagent 各自重读 SKILL 还把培养模式标签判错。
 MATCHING_RULE: str = (
-    "判断今年每个专业和往年哪个候选是同一个专业。基数规则(单一判据): "
-    "一对一、一对多可以; 多对一不行。往年数据是基准, 今年往往年上靠。"
-    "(1) 候选只有 1 个 → 就是它(一对多: 今年这个核心名下的多个变体都配这 1 个"
-    "往年专业, 因为只有这 1 个数据可用)。"
-    "(2) 候选多个 → 今年每个专业按实际描述挑往年 1 个对应(一对一, 不能把往年"
-    "多个并到今年 1 个上=多对一)。永远不算身份的差异: 培养模式标签(拔尖/卓越/"
-    "创新/英才/基地/未来/试验班/订单班等「XX 班」)、描述性噪音(标点/词序/体检"
-    "/学费/语种/加减括号内容/子专业清单长描述)——对得上就配。一对一时算不同"
-    "专业的差异: 中外合作、师范、性别(男/女)、招生类别(普通/地方专项/综合"
-    "评价)、真正不同的方向(如投资学(量化投资)≠投资学)——今年这个专业若往年"
-    "只有这些对不上的类别, 就配 null(交估算), 别硬配。"
-    "一对多的常见形式: 往年按大类(X类)招、今年拆成具体(X)——这是 1 个往年大类"
-    "↔今年单个/多个具体, 属一对多, 配(往年大类线差作参考, 如 经济学↔经济学类、"
-    "护理学↔护理学类、法学↔法学类)。按描述确认大类确实含这个具体方向; 工科试验"
-    "班类这种混杂宽大类除外(对不上→null 走估算)。"
+    "判断今年每个专业和往年哪个候选是同一个专业。基数: 一对一、一对多允许, "
+    "多对一不行。"
+    "(前提)往年同核心只有 1 个的 item 已由程序(Stage 1.5)直接配好了, 不会到你"
+    "手里——你看到的 item 都是「2 个及以上候选」, 任务是按实际描述挑往年 1 个"
+    "最对应的(一对一; 不能把往年多个并到今年 1 个上)。挑不出真正对应的就配 null。"
+    "永远不算身份(对得上就配): 培养模式标签(拔尖/卓越/创新/英才/基地/未来/试验"
+    "班/订单班等「XX 班」)、学制差异(5+3/五年制/八年制等)、校区、出国模式(中澳/"
+    "中俄/1+3 等)、描述性噪音(标点/词序/体检/学费/语种/子专业清单长描述)。"
+    "一对一时算不同专业(挑不到对应→null): 中外合作、师范、性别(男/女)、招生类别"
+    "(普通/地方专项/综合评价)、真正不同的方向(如投资学(量化投资)≠投资学)。"
+    "大类↔具体(X↔X类，经济学↔经济学类、护理学↔护理类): 算同核心, 配(大类线差作参考);"
+    "工科试验班类这种混杂宽大类除外(挑不出→null)。"
+    "**照搬这条规则, 不要自己改写或加判据**——上面已覆盖 5+3/学制/校区/出国等边界"
+    "(都按「往年只有一种→用; 多种→按方向对齐」处理)。有疑问配 null, 别瞎配。"
     "结果用 scripts.write_batch_result 写、不要手写 JSON。"
 )
 
@@ -113,18 +112,17 @@ def _same_school_cat(dl: DaglubenRow, h: HistoryRow) -> bool:
 
 
 def _core_compatible(dl_core: str, h_core: str) -> bool:
-    """Core-name pre-filter: exact, or one is a substring of the other.
+    """Core-name pre-filter: exact, or **X ↔ X类**（大类↔具体）.
 
-    Substring relaxation absorbs the「经济学类 vs 经济学」「数学类 vs 数学」
-    style drift that the prototype identified as归一化 pseudo-misses — the
-    agent still gets to make the final call, but the candidate pool is not
-    gutted by a too-strict equality.
+    旧版用「互为子串」→ 化学配到化学工程与工艺（不同专业，§5.3 bug）。
+    现在只允许精确 + X↔X类（经济学↔经济学类、数学↔数学类）——大类招生↔具体
+    专业是 OPP-1 一对多形式。化学↔化学工程与工艺 这种纯子串不再算兼容。
     """
     if not dl_core or not h_core:
         return False
     if dl_core == h_core:
         return True
-    return dl_core in h_core or h_core in dl_core
+    return dl_core + "类" == h_core or h_core + "类" == dl_core
 
 
 def _is_candidate(dl: DaglubenRow, h: HistoryRow) -> bool:

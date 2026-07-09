@@ -197,12 +197,9 @@ def test_match_coarse_multi_candidate_disambiguates_when_brackets_subset():
         ),
     ]
     accepted, still = stage1_5_coarse.match_coarse(unmatched, core_idx)
-    assert len(accepted) == 1
-    assert len(still) == 0
-    r = accepted[0]
-    assert r["matched"] is True
-    assert r["J"] == 80.0
-    assert r["log"].startswith("核心名匹配：核心专业名相同")
+    # 多候选（2+）→ 不再程序 bracket-subset 消歧，全部交 Stage 2 agent。
+    assert len(accepted) == 0
+    assert len(still) == 1
 
 
 def test_match_coarse_multi_candidate_still_unmatched_when_ambiguous():
@@ -417,7 +414,9 @@ def test_stage1_then_stage1_5_pipeline_combines_results():
         dagluben[i] for i, r in enumerate(strict_results) if not r["matched"]
     ]
     core_idx = stage1_5_coarse.build_core_idx(history)
-    coarse_accepted, coarse_still = stage1_5_coarse.match_coarse(unmatched_dl, core_idx)
+    coarse_accepted, coarse_still = stage1_5_coarse.match_coarse(
+        unmatched_dl, core_idx, stage1_5_coarse.build_core_school_idx(history)
+    )
 
     assert len(coarse_accepted) == 1
     assert coarse_accepted[0]["src_row_idx"] == 2
@@ -457,7 +456,9 @@ class TestStage1_5Smoke:
 
         unmatched_dl = [dl[i] for i, r in enumerate(strict_results) if not r["matched"]]
         core_idx = stage1_5_coarse.build_core_idx(hist)
-        accepted, _still = stage1_5_coarse.match_coarse(unmatched_dl, core_idx)
+        accepted, _still = stage1_5_coarse.match_coarse(
+            unmatched_dl, core_idx, stage1_5_coarse.build_core_school_idx(hist)
+        )
 
         strict_hits = len(dl) - len(unmatched_dl)
         total_auto = strict_hits + len(accepted)
@@ -499,8 +500,9 @@ def test_match_coarse_disambig_single_year_history_adds_no_stddev_note():
     idx = stage1_5_coarse.build_core_idx(history)
     dagluben = [_dl(school="A大学", core="数学", major="数学(男)", src_row_idx=1)]
     accepted, still = stage1_5_coarse.match_coarse(dagluben, idx)
-    assert len(accepted) == 1
-    assert SINGLE_YEAR_NOTE in accepted[0]["log"]
+    # 2 候选（男/女）→ 多候选交 Stage 2 agent，不自动消歧。
+    assert len(accepted) == 0
+    assert len(still) == 1
 
 
 def test_match_coarse_multi_year_history_does_not_add_note():

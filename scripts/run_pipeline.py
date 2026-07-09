@@ -58,6 +58,7 @@ from scripts.stage0_merge import (
     build_unified_history,
 )
 from scripts.stage1_strict import match_strict
+from scripts.stage1_5_coarse import build_core_idx, build_core_school_idx, match_coarse
 from scripts.stage2_agent import build_batches, write_prompts
 from scripts.stage2_apply import apply_results
 from scripts.stage3_edges import deleted_majors, flight_and_special
@@ -531,13 +532,16 @@ def run(
         / max(1, len(strict_results)),
     )
 
-    # --- Stage 1.5 已并入 Stage 2 ------------------------------------------
-    # 程序模糊匹配（核心名粗筛自动接受）已停用：全部 strict 未匹配交由 Stage 2
-    # agent 逐条语义判断。skill 规格＝只有「程序严格匹配 + agent 语义匹配」，
-    # 不让程序做模糊决定（避免「临床医学5+3」式低级误判）。coarse_results 恒空，
-    # 保留为占位以维持下游 _build_main_results 签名稳定（#18 清理时再删）。
-    coarse_results: list[MatchResult] = []
-    post_coarse_unmatched = strict_unmatched_dgl
+    # --- Stage 1.5: past=1 自动匹配（1 候选程序直接配）---------------------
+    # 重开（曾因「临床医学5+3」式误判停用，但那是多候选 bracket-subset 消歧的锅，
+    # past=1 唯一候选路径一直安全）。现在只做 past=1（同校同核心只 1 个→直接配，
+    # 含跨类别回退：同类别无候选时退到同校任意类别，让名头变了的往年行也配上），
+    # 多候选仍交 Stage 2 agent。修 fresh-test 2026-07-09 的 651 条 past=1 未匹配。
+    coarse_results, post_coarse_unmatched = match_coarse(
+        strict_unmatched_dgl,
+        build_core_idx(history),
+        build_core_school_idx(history),
+    )
     logger.info(
         "Stage1.5: 程序模糊匹配已停用，%d 条 strict 未匹配全部进 Stage2 agent",
         len(post_coarse_unmatched),
@@ -644,8 +648,8 @@ def run(
             else ""
             for e in verify_out["demoted"]
         }
-        # coarse 已停用（coarse_results 恒空）→ 无需 filter；coarse_for_main 保持空。
-        coarse_for_main: list[MatchResult] = []
+        # coarse past=1 是构造确定（豁免复核）→ 不 filter，直接进主表。
+        coarse_for_main = coarse_results
         semantic_for_main, _, _ = filter_demoted(
             semantic_results,
             set(),
@@ -655,6 +659,7 @@ def run(
         # Build the classified set from the filtered results (so存疑 idx drop).
         classified_for_main = (
             {r["src_row_idx"] for r in strict_results if r.get("matched")}
+            | {r["src_row_idx"] for r in coarse_results if r.get("matched")}
             | {r["src_row_idx"] for r in semantic_for_main if r.get("matched")}
             | {d["src_row_idx"] for d in new_majors}
         )
@@ -687,6 +692,7 @@ def run(
         if classified_for_main is not None
         else (
             {r["src_row_idx"] for r in strict_results if r.get("matched")}
+            | {r["src_row_idx"] for r in coarse_results if r.get("matched")}
             | {r["src_row_idx"] for r in semantic_results if r.get("matched")}
             | {d["src_row_idx"] for d in new_majors}
         )
