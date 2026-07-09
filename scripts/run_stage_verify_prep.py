@@ -52,13 +52,19 @@ def main() -> int:
         help="Do not apply batch_*_result.jsonl when extracting judgmental "
         "matches (use the strict+coarse-only口径).",
     )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging verbosity (default INFO).",
+    )
     # 与 run_pipeline 同一组数据源参数（BUG-2: 此前一个都不转发，导致 verify
     # prep 用默认一段线/文件名，与最终产出不一致）。
     add_source_files_args(parser)
     args = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, args.log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
@@ -103,7 +109,7 @@ def main() -> int:
     print(f"  粗筛(核心名唯一/消歧): {coarse_n}")
     print(f"  语义匹配(agent):      {semantic_n}")
     print(f"切批 (20/批): {len(paths)} 批 → semantic-match/verify_batch_NN.json")
-    print("下一步: 按 semantic-match/RUN_VERIFY.md 派发复核 agent。")
+    print("下一步: 按 REFERENCE「管线串联命令」第 6-7 步派发复核 agent。")
     return 0
 
 

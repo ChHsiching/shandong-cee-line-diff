@@ -1,7 +1,7 @@
 """Stage 2 — apply agent semantic-match results back into the main table.
 
 Reads ``batch_NN_result.jsonl`` files (written by the harness after agent
-dispatch — see ``semantic-match/RUN.md``) and back-fills ``match`` / ``J`` /
+dispatch — see ``REFERENCE「管线串联命令」第 4 步``) and back-fills ``match`` / ``J`` /
 ``T`` / ``reason`` into :class:`MatchResult` rows.
 
 Contract enforcement (hard rejects — never silently corrupt the main table):
@@ -85,26 +85,53 @@ def _subject_drift_note(dagluben: DaglubenRow, matched: HistoryRow | None) -> st
     return f"；{LOG_SUBJECT_NOTE}"
 
 
+def _num_eq(a: float | None, b: float | None) -> bool:
+    """None-与数值安全相等比较（2 位精度）。J/T 定位历史行用。"""
+    if a is None or b is None:
+        return a is None and b is None
+    return round(a, 2) == round(b, 2)
+
+
 def _find_matched(
-    match_major: str, dagluben: DaglubenRow, history: Sequence[HistoryRow]
+    match_major: str,
+    dagluben: DaglubenRow,
+    history: Sequence[HistoryRow],
+    *,
+    exp_j: float | None = None,
+    exp_t: float | None = None,
 ) -> HistoryRow | None:
-    """Locate the history row whose major == match_major among the
-    dagluben row's candidate pool. Returns None if match is null or no
-    matching history row exists (the latter should not happen because the
-    contract check already guaranteed membership)."""
+    """Locate the history row the agent chose (major == match_major).
+
+    **镜像 :func:`_candidate_set`**：同类别有候选则只认同类别，否则跨类别回退
+    （省属公费生 history school_cat 常空、大绿本显式类别——_candidate_set 让 agent
+    选了它，这里必须也能定位，否则 apply 报「通过候选集但无法定位历史行」崩溃）。
+
+    同名多行（如飞行技术不同送培航司 J/T 不同）→ 用结果 J/T（来自 agent 选中的候选）
+    唯一定位，避免取到相邻同名行。Returns None if no match."""
     dl_school = dagluben.get("school", "")
     dl_cat = normalise_cat(dagluben.get("school_cat", ""))
     dl_core = dagluben.get("core", "")
+    same_rows: list[HistoryRow] = []
+    any_rows: list[HistoryRow] = []
+    same_cat_exists = False
     for h in history:
         if h.get("school", "") != dl_school:
             continue
-        if normalise_cat(h.get("school_cat", "")) != dl_cat:
+        if not _core_compatible(dl_core, h.get("core", "")):
             continue
-        if h.get("major", "") == match_major and _core_compatible(
-            dl_core, h.get("core", "")
-        ):
-            return h
-    return None
+        is_same = normalise_cat(h.get("school_cat", "")) == dl_cat
+        if is_same:
+            same_cat_exists = True
+        if h.get("major", "") == match_major:
+            (same_rows if is_same else any_rows).append(h)
+    pool = same_rows if same_cat_exists else any_rows  # mirror _candidate_set
+    if not pool:
+        return None
+    if exp_j is not None:
+        for h in pool:
+            if _num_eq(h.get("J"), exp_j) and _num_eq(h.get("T"), exp_t):
+                return h
+    return pool[0]
 
 
 def _parse_line(raw: str, path: Path, lineno: int) -> dict[str, object]:
@@ -192,7 +219,9 @@ def _validate_and_build(
             f"不在候选集内(候选数={len(allowed)}) — agent 越界/幻觉"
         )
 
-    matched_hist = _find_matched(match_major, dagluben, history)
+    matched_hist = _find_matched(
+        match_major, dagluben, history, exp_j=j_raw, exp_t=t_raw
+    )
     # Membership in `allowed` guarantees _find_matched succeeds; guard anyway.
     if matched_hist is None:
         raise Stage2ContractError(

@@ -177,7 +177,7 @@ def _apply_stage2(
     write_prompts(batches, semantic_dir)
     logger.info(
         "Stage2: 未发现 batch_*_result.jsonl，已写出 %d 个批次 prompt；"
-        "Stage2 待 harness 派发（见 semantic-match/RUN.md）",
+        "Stage2 待 harness 派发（见 REFERENCE「管线串联命令」第 4 步）",
         len(batches),
     )
     return [], list(post_coarse_unmatched), False
@@ -543,7 +543,8 @@ def run(
         build_core_school_idx(history),
     )
     logger.info(
-        "Stage1.5: 程序模糊匹配已停用，%d 条 strict 未匹配全部进 Stage2 agent",
+        "Stage1.5: past=1 程序配了 %d 条（往年同核心只 1 个→直接配），剩 %d 条进 Stage2 agent",
+        len(coarse_results),
         len(post_coarse_unmatched),
     )
 
@@ -683,7 +684,7 @@ def run(
         else:
             logger.info(
                 "复核: 未发现 verify_*_result.jsonl，判断型复核 待 harness 派发"
-                "（见 semantic-match/RUN_VERIFY.md）"
+                "（见 REFERENCE「管线串联命令」第 6-7 步）"
             )
 
     # Flight + remaining-unmatched → special.
@@ -818,7 +819,8 @@ def add_source_files_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--supplement-batches",
         default=None,
-        help="补充表批次名，逗号分隔（如 本科提前批A类,本科提前批B类）",
+        help="补充表批次名，逗号分隔（如 本科提前批A类,本科提前批B类；"
+        "缺的批次自动跳过，不必删——今年只有 A类 也直接用默认）",
     )
     parser.add_argument(
         "--supplement-low-cols",
@@ -963,7 +965,7 @@ def main() -> None:
     if not report["stage2_applied"]:
         print()
         print("注: 未应用 Stage2 agent 结果（语义匹配待 harness 派发，")
-        print("    见 semantic-match/RUN.md）。匹配置为严格匹配口径。")
+        print("    见 REFERENCE「管线串联命令」第 4 步）。匹配置为严格匹配口径。")
     if not report["rename_applied"]:
         print("注: 未应用改名 agent 结果（改名配对待 harness 派发，")
         print("    见 semantic-match/rename_prompt.md / REFERENCE 第 2 步）。被删/新增校为上界。")

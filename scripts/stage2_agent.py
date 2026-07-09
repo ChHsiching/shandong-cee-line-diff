@@ -12,7 +12,7 @@ correspondence. **The agent itself cannot be invoked from a Python script**
     item carrying full dagluben info + candidate list + output schema.
 
 The actual agent dispatch + result collection is a harness-side step; see
-``semantic-match/RUN.md``. Results land in ``batch_NN_result.jsonl`` and are
+``REFERENCE「管线串联命令」第 4 步``. Results land in ``batch_NN_result.jsonl`` and are
 back-filled by :mod:`scripts.stage2_apply`.
 
 Candidate pre-filter (spec §6 Stage 2 「按基础专业名预筛」): a history row is

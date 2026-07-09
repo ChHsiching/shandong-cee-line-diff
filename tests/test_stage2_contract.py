@@ -130,6 +130,107 @@ def test_accept_null_match(tmp_path: Path) -> None:
     assert results[0]["matched"] is False
 
 
+def test_apply_locates_cross_category_history_row(tmp_path: Path) -> None:
+    """§3 (fresh-test 2026-07-10)：省属公费生 history school_cat 空、大绿本显式类别。
+    _candidate_set 跨类别回退让 agent 选了它；_find_matched 必须镜像 _candidate_set
+    也能定位，否则 apply 报「通过候选集但无法定位历史行」崩溃（实测 478 条）。"""
+    dagluben = [
+        DaglubenRow(
+            src_row_idx=1,
+            school="青岛农业大学",
+            school_cat="省属公费农科生",
+            major="动物科学(省属公费农科生,面向济南市就业)",
+            stripped="动物科学",
+            core="动物科学",
+            subject="物理和化学",
+            batch="1.提前批A类",
+        )
+    ]
+    history = [
+        HistoryRow(  # history school_cat 空（类别只在专业名里，近三年表的常态）
+            school="青岛农业大学",
+            school_cat="",
+            major="动物科学",
+            stripped="动物科学",
+            core="动物科学",
+            subject="物理",
+            J=120.0,
+            T=3.0,
+            source_table="提前批",
+        )
+    ]
+    jsonl = _write(
+        tmp_path,
+        [
+            json.dumps(
+                {
+                    "src_row_idx": 1,
+                    "school": "青岛农业大学",
+                    "major": "动物科学(省属公费农科生,面向济南市就业)",
+                    "match": "动物科学",
+                    "J": 120.0,
+                    "T": 3.0,
+                    "reason": "公费农科一对多",
+                },
+                ensure_ascii=False,
+            )
+        ],
+    )
+    results = apply_results([jsonl], dagluben, history)
+    assert results[0]["matched"] is True
+    assert results[0]["J"] == 120.0
+
+
+def test_apply_disambiguates_same_name_history_rows_by_jt(tmp_path: Path) -> None:
+    """同名专业在历史里有多行（不同送培航司，J/T 不同）——_find_matched 用结果
+    J/T 唯一定位，不能取到相邻同名行（§3 飞行技术 case：J=10.67 被取成 11.0）。"""
+    dagluben = [_dl(1, "山东交通学院", "飞行技术(自费)", "飞行技术")]
+    history = [
+        HistoryRow(
+            school="山东交通学院",
+            school_cat="",
+            major="飞行技术",
+            stripped="飞行技术",
+            core="飞行技术",
+            subject="物理",
+            J=11.0,
+            T=2.0,
+            source_table="提前批",
+        ),
+        HistoryRow(
+            school="山东交通学院",
+            school_cat="",
+            major="飞行技术",
+            stripped="飞行技术",
+            core="飞行技术",
+            subject="物理",
+            J=10.67,
+            T=1.5,
+            source_table="提前批",
+        ),
+    ]
+    jsonl = _write(
+        tmp_path,
+        [
+            json.dumps(
+                {
+                    "src_row_idx": 1,
+                    "school": "山东交通学院",
+                    "major": "飞行技术(自费)",
+                    "match": "飞行技术",
+                    "J": 10.67,
+                    "T": 1.5,
+                    "reason": "自费对应",
+                },
+                ensure_ascii=False,
+            )
+        ],
+    )
+    results = apply_results([jsonl], dagluben, history)
+    assert results[0]["matched"] is True
+    assert results[0]["J"] == 10.67  # 定位到 J=10.67 那行，不是相邻的 11.0
+
+
 # --- contract: at most one result per dagluben src_row_idx ------------------
 
 

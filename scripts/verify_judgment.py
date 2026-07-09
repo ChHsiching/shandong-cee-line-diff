@@ -16,7 +16,7 @@ tool), so this module ships only the testable pure layer:
 
 The harness-side dispatch (read verify_batch_NN.json → Agent(general-purpose)
 with verify_prompt.md → verify_batch_NN_result.jsonl) is documented in
-``semantic-match/RUN_VERIFY.md``; it is not invoked here.
+``REFERENCE「管线串联命令」第 6-7 步``; it is not invoked here.
 """
 
 from __future__ import annotations
