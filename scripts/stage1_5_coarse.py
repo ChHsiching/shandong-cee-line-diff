@@ -190,9 +190,13 @@ def match_coarse(
             if _core_compatible(dl_core, h.get("core", ""))
         ]
         if len(any_cat) == 1:
-            accepted.append(
-                _accept(d, any_cat[0], LOG_COARSE_CANDIDATE + "（跨类别一对多）")
-            )
+            # 综合评价是复合分录取（高考+校测+学考），线差语义跟普通类不可比——
+            # 如果今年是综合评价、往年只有普通类，加备注提示线差是参考值。
+            dl_major = d.get("major", "") or ""
+            note = "（跨类别一对多）"
+            if "综合评价" in dl_major or "综合评价" in d.get("school_cat", ""):
+                note += "；综合评价按普通类线差参考"
+            accepted.append(_accept(d, any_cat[0], LOG_COARSE_CANDIDATE + note))
             continue
 
         # 0 或 2+ → Stage 2 agent（旧 multi-candidate bracket-subset 消歧已停用）
