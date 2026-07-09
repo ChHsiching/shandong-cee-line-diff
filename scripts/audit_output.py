@@ -85,7 +85,9 @@ PRODUCED_TABLES: tuple[str, ...] = (
 # copy). The audit reads 匹配阶段 by column NAME, so a future wording tweak in
 # the log constants cannot silently drop a row from a check.
 STAGE_HEADER = HEADER_STAGE  # #18d: 列名单点（write_outputs.HEADER_STAGE）
-MATCHED_STAGES: frozenset[str] = JUDGMENTAL_STAGES | {"严格匹配"}
+# Matched = 严格匹配 + 核心名匹配(Stage1.5 past=1，构造确定) + agent 语义匹配。
+# 核心名匹配不是 JUDGMENTAL（豁免复核），但仍是 matched（jt_consistency 仍抽查）。
+MATCHED_STAGES: frozenset[str] = JUDGMENTAL_STAGES | {"严格匹配", "核心名匹配"}
 ESTIMATE_STAGE = "新增专业"
 
 # Column indices in the hierarchical / flat output (1-based) — used only for

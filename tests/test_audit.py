@@ -83,7 +83,7 @@ def _good_output_dir(tmp_path: Path) -> Path:
 
     Hierarchical / flat carry three 本科 major rows:
       - 严格匹配 (src_row_idx=2)
-      - 核心名匹配 (src_row_idx=3) — judgmental, confirmed in the verify jsonl
+      - agent 语义匹配 (src_row_idx=3) — judgmental, confirmed in the verify jsonl
       - 新增专业 (src_row_idx=4) — estimate row; J/T from 今年新增往年没有的专业.xlsx
     Each row carries the 5 structured columns directly (no legacy log cell).
     """
@@ -112,7 +112,7 @@ def _good_output_dir(tmp_path: Path) -> Path:
             "",
             "归一化专业名+招生类别一致",
         ],
-        # coarse judgmental matched (src_row_idx=3) — confirmed
+        # agent 语义匹配 (src_row_idx=3) — judgmental, confirmed in verify jsonl
         [
             "4.常规批",
             "普通计划",
@@ -128,11 +128,11 @@ def _good_output_dir(tmp_path: Path) -> Path:
             "02数学",
             70.0,
             None,
-            "核心名匹配",
+            "agent 语义匹配",
             "",
             "",
             "确定",
-            "核心名唯一",
+            "语义匹配：方向对齐",
         ],
         # new major estimate (src_row_idx=4) — J/T from estimate, rounded
         [

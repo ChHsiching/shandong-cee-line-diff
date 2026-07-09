@@ -70,9 +70,10 @@ OUTPUT_SCHEMA: dict[str, object] = {
 MATCHING_RULE: str = (
     "判断今年每个专业和往年哪个候选是同一个专业。基数: 一对一、一对多允许, "
     "多对一不行。"
-    "(前提)往年同核心只有 1 个的 item 已由程序(Stage 1.5)直接配好了, 不会到你"
-    "手里——你看到的 item 都是「2 个及以上候选」, 任务是按实际描述挑往年 1 个"
-    "最对应的(一对一; 不能把往年多个并到今年 1 个上)。挑不出真正对应的就配 null。"
+    "(前提)程序已处理两类 item、不会到你手里: 往年同核心只 1 个的(Stage 1.5 直接"
+    "配)、同校真没有同核心的(0 候选→直接走估算)。你看到的 item 都是「2 个及以上"
+    "候选」, 任务是按实际描述挑往年 1 个最对应的(一对一; 不能把往年多个并到今年"
+    " 1 个上)。挑不出真正对应的就配 null(→走估算)。"
     "永远不算身份(对得上就配): 培养模式标签(拔尖/卓越/创新/英才/基地/未来/试验"
     "班/订单班等「XX 班」)、学制差异(5+3/五年制/八年制等)、校区、出国模式(中澳/"
     "中俄/1+3 等)、描述性噪音(标点/词序/体检/学费/语种/子专业清单长描述)。"
@@ -156,20 +157,38 @@ def build_batches(
     if batch_size <= 0:
         batch_size = len(unmatched_list)
 
-    # Bucket history once by (school, normalised cat) so candidate lookup is
-    # O(candidates) not O(all-history) per dagluben row.
-    hist_by_school: dict[tuple[str, str], list[HistoryRow]] = {}
+    # Bucket history by (school, cat) AND by school-only (for 跨类别回退).
+    by_school_cat: dict[tuple[str, str], list[HistoryRow]] = {}
+    by_school: dict[str, list[HistoryRow]] = {}
     for h in history_list:
-        key = (h.get("school", ""), normalise_cat(h.get("school_cat", "")))
-        hist_by_school.setdefault(key, []).append(h)
+        by_school_cat.setdefault(
+            (h.get("school", ""), normalise_cat(h.get("school_cat", ""))), []
+        ).append(h)
+        by_school.setdefault(h.get("school", ""), []).append(h)
 
     items: list[BatchItem] = []
     for d in unmatched_list:
-        key = (d.get("school", ""), normalise_cat(d.get("school_cat", "")))
-        pool = hist_by_school.get(key, [])
-        candidates = [
-            h for h in pool if _core_compatible(d.get("core", ""), h.get("core", ""))
+        dl_core = d.get("core", "")
+        # 同类别同核心；为空则跨类别回退（同校任意类别）——与 Stage 1.5 一致，
+        # 让多候选跨类别 item（如今年普通、往年有中外合作+师范）也能被 agent 判。
+        same_cat = [
+            h
+            for h in by_school_cat.get(
+                (d.get("school", ""), normalise_cat(d.get("school_cat", ""))), []
+            )
+            if _core_compatible(dl_core, h.get("core", ""))
         ]
+        if same_cat:
+            candidates = same_cat
+        else:
+            candidates = [
+                h
+                for h in by_school.get(d.get("school", ""), [])
+                if _core_compatible(dl_core, h.get("core", ""))
+            ]
+        # 0 候选（同校真没有同核心）→ 不进 agent batch，直接走估算（identify_new_majors）。
+        if not candidates:
+            continue
         items.append(BatchItem(dagluben=d, candidates=candidates))
 
     batches: list[Batch] = []

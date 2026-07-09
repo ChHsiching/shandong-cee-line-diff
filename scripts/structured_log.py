@@ -23,9 +23,11 @@ _VERIFY_OK = "确定"
 _COLON = "："
 
 # Stages whose matches are judgment-type (need second-pass verify).
-# The 二次复核 column is「确定」only for these after a confirmed verdict.
+# 只有「agent 语义匹配」需要二次复核——「核心名匹配」是 Stage 1.5 past=1 程序
+# 直接配（构造确定，像严格匹配一样不靠 agent 判断），豁免复核（fresh-test
+# 2026-07-09 §8：保留它会让 audit judgmental_coverage 误判为缺复核而 FAIL）。
 # 公开（audit_output 复用——#18d 单点化 stage 名，避免两处定义漂移）.
-JUDGMENTAL_STAGES: frozenset[str] = frozenset({"核心名匹配", "agent 语义匹配"})
+JUDGMENTAL_STAGES: frozenset[str] = frozenset({"agent 语义匹配"})
 
 # Prefixed stages: log text before the first「：」 → stage label.
 _PREFIXED_STAGES: tuple[tuple[str, str], ...] = (

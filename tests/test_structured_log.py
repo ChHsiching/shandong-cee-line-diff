@@ -53,7 +53,7 @@ def test_coarse_unique_core_name() -> None:
     assert out["匹配方式"] == "核心名匹配"
     assert out["仅一年数据"] == ""
     assert out["选科要求跨年变化"] == ""
-    assert out["二次复核"] == "确定"  # judgmental — verified
+    assert out["二次复核"] == ""  # 核心名匹配=past=1 构造确定，豁免复核
     assert out["原因说明"] == "核心专业名相同"
 
 
@@ -63,7 +63,7 @@ def test_coarse_disambig_with_drift() -> None:
     assert out["匹配方式"] == "核心名匹配"
     assert out["仅一年数据"] == ""
     assert out["选科要求跨年变化"] == "是"
-    assert out["二次复核"] == "确定"
+    assert out["二次复核"] == ""  # 构造确定，豁免复核
     assert out["原因说明"] == "核心专业名相同（不限选考科目类专业）"
 
 
@@ -72,7 +72,7 @@ def test_coarse_without_drift_leaves_drift_blank() -> None:
     out = split_log(f"{LOG_COARSE_CANDIDATE}（理工类）")
     assert out["匹配方式"] == "核心名匹配"
     assert out["选科要求跨年变化"] == ""
-    assert out["二次复核"] == "确定"
+    assert out["二次复核"] == ""  # 构造确定，豁免复核
     assert out["原因说明"] == "核心专业名相同（理工类）"
 
 

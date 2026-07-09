@@ -77,7 +77,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 
 问到的文件名 / 一段线 / 补充表配置，跑 `run_pipeline` 时通过 CLI 参数传（`--dl-file` / `--one-line` / `--supplement-batches` / `--supplement-low-cols` 等，见 REFERENCE 的「run_pipeline CLI 参数」段），**不要硬编码到代码里**——数据年年变，参数化才能复用。
 
-**问卷答完，整个整理流程按 REFERENCE 的「管线串联命令」段（8 步）执行**：跑管线 → 派改名 agent → 跑管线（重生成改名感知 batch）→ 派语义 agent → 跑管线 → 派复核 agent → 跑管线 → 审计。SKILL 第二~七步是每步**在做什么**的逻辑说明（你跑管线时这些自动发生），你只需要按 REFERENCE 的命令串联 + 在「派 agent」步骤派 subagent（并发 ≤6）。
+**问卷答完，整个整理流程按 REFERENCE 的「管线串联命令」段（8 步）执行**：跑管线 → 派改名 agent → 跑管线（重生成改名感知 batch）→ 派语义 agent → 跑管线 → 派复核 agent → 跑管线 → 审计。SKILL 第二~七步是每步**在做什么**的逻辑说明（你跑管线时这些自动发生），你只需要按 REFERENCE 的命令串联 + 在「派 agent」步骤派 subagent（并发 ≤6；**若撞 429 / 5 小时用量上限被砍**，改在主会话直接处理剩余批——主会话不受此限）。
 
 ---
 
@@ -145,7 +145,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 
 ## 第四步：agent 二次复核
 
-所有 agent 判断的匹配（程序严格匹配以外的全部），再做一轮独立复核：另一个 agent 逐条看「这个匹配对不对」，判「确认」或「存疑」。
+只有 **agent 语义匹配**（agent 判断的）需要复核。**核心名匹配**（程序 Stage 1.5 把「往年同核心只 1 个」的 past=1 直接配上）是构造确定——像严格匹配一样**不进复核**（基数规则已定，agent 保守判断只会添乱）。这一步只复核 agent 语义匹配：另一个 agent 逐条看「这个匹配对不对」，判「确认」或「存疑」。
 
 - 确认 → 留在主表。
 - 存疑 → 移到特殊情况表，不进主表。

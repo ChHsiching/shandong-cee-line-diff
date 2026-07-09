@@ -131,14 +131,12 @@ def test_build_batches_empty_unmatched_returns_empty() -> None:
     )
 
 
-def test_build_batches_no_candidates_still_emits_item() -> None:
-    """A dagluben专业 whose school has NO history still becomes an item with an
-    empty candidate list — the agent may legitimately answer ``match=null``."""
+def test_build_batches_skips_zero_candidate_items() -> None:
+    """0 候选（同校真没有同核心）的 item 不进 agent batch——直接走估算
+    (identify_new_majors)。agent 只看多候选 item。"""
     unmatched = [_dl("新校", "新专业", "新专业", 1)]
     batches = build_batches(unmatched, [], batch_size=20)
-    assert len(batches) == 1
-    assert len(batches[0].items) == 1
-    assert batches[0].items[0].candidates == []
+    assert batches == []  # 0 候选 → 不进 batch
 
 
 # ---------------------------------------------------------------------------
@@ -189,12 +187,17 @@ def test_write_prompts_emits_one_json_per_batch_with_required_fields(
 
 
 def test_write_prompts_preserves_item_order_and_indices(tmp_path: Path) -> None:
+    history = [
+        _hist("甲大学", "数学", "数学", 90.0),
+        _hist("甲大学", "物理", "物理", 60.0),
+        _hist("甲大学", "化学", "化学", 70.0),
+    ]
     unmatched = [
         _dl("甲大学", "数学", "数学", 10),
         _dl("甲大学", "物理", "物理", 20),
         _dl("甲大学", "化学", "化学", 30),
     ]
-    batches = build_batches(unmatched, [], batch_size=2)
+    batches = build_batches(unmatched, history, batch_size=2)
     paths = write_prompts(batches, tmp_path)
     b1 = json.loads(paths[0].read_text(encoding="utf-8"))
     b2 = json.loads(paths[1].read_text(encoding="utf-8"))

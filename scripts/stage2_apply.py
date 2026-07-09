@@ -58,20 +58,21 @@ class Stage2ContractError(ValueError):
 
 def _candidate_set(dagluben: DaglubenRow, history: Sequence[HistoryRow]) -> set[str]:
     """The set of近三年 major strings the agent was allowed to pick from for
-    this dagluben row. Mirrors :func:`scripts.stage2_agent._is_candidate` but
-    returns the major names so we can membership-test the agent's answer."""
+    this dagluben row. Must mirror :func:`scripts.stage2_agent.build_batches`'
+    candidate logic: 同类别同核心；为空则跨类别回退（同校任意类别）。"""
     dl_school = dagluben.get("school", "")
     dl_cat = normalise_cat(dagluben.get("school_cat", ""))
     dl_core = dagluben.get("core", "")
-    out: set[str] = set()
+    same_cat: set[str] = set()
+    any_cat: set[str] = set()
     for h in history:
         if h.get("school", "") != dl_school:
             continue
-        if normalise_cat(h.get("school_cat", "")) != dl_cat:
-            continue
         if _core_compatible(dl_core, h.get("core", "")):
-            out.add(h.get("major", ""))
-    return out
+            any_cat.add(h.get("major", ""))
+            if normalise_cat(h.get("school_cat", "")) == dl_cat:
+                same_cat.add(h.get("major", ""))
+    return same_cat if same_cat else any_cat  # 跨类别回退（与 build_batches 一致）
 
 
 def _subject_drift_note(dagluben: DaglubenRow, matched: HistoryRow | None) -> str:
