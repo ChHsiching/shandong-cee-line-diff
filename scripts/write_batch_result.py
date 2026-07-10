@@ -70,9 +70,14 @@ def build_results(
             t: float | None = None
         else:
             if not isinstance(cand, int) or cand < 0 or cand >= len(candidates):
+                hint = (
+                    "（null 用 - 或空，不是 -1）"
+                    if isinstance(cand, int) and cand < 0
+                    else ""
+                )
                 raise DecisionsError(
                     f"src_row_idx={idx} cand={cand!r} 越界（该 item 有 "
-                    f"{len(candidates)} 个候选，cand 须是 0..{len(candidates) - 1}）"
+                    f"{len(candidates)} 个候选，cand 须是 0..{len(candidates) - 1}）{hint}"
                 )
             chosen = candidates[cand]
             match = chosen.get("major")

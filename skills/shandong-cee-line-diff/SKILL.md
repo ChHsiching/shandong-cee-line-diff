@@ -24,6 +24,7 @@ plugin 根（$P）含 scripts/ + .venv。**Claude Code**：plugin 自带 Session
 P=""; best=""
 for sk in $(find ~/.claude/plugins/cache ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*"); do
   d=$(dirname "$(dirname "$(dirname "$sk")")")
+  [ -e "$d/.orphaned_at" ] && continue  # 跳过已被新版本顶替的 orphaned 副本（fresh-test run8 曾选中 orphaned 1.5.4）
   v=$(grep -m1 -o '"version":[[:space:]]*"[^"]*"' "$d/.claude-plugin/plugin.json" 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
   if [ -n "$v" ] && { [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -V | tail -1)" = "$v" ]; }; then
     best="$v"; P="$d"
@@ -33,6 +34,7 @@ done
 if [ -z "$P" ]; then
   for sk in $(find ~/.claude/plugins ~/.zcode/skills ~/.codex ~/.local/share 2>/dev/null -name SKILL.md -path "*shandong-cee-line-diff*"); do
     d=$(dirname "$(dirname "$(dirname "$sk")")")
+  [ -e "$d/.orphaned_at" ] && continue  # 跳过已被新版本顶替的 orphaned 副本（fresh-test run8 曾选中 orphaned 1.5.4）
     v=$(grep -m1 -o '"version":[[:space:]]*"[^"]*"' "$d/.claude-plugin/plugin.json" 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
     if [ -n "$v" ] && { [ -z "$best" ] || [ "$(printf '%s\n%s\n' "$best" "$v" | sort -V | tail -1)" = "$v" ]; }; then
       best="$v"; P="$d"
@@ -42,7 +44,7 @@ fi
 PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --help >/dev/null 2>&1 && echo "✓ 环境就绪, PLUGIN_ROOT=$P (v$best)"
 ```
 
-> 为什么读 `plugin.json` 版本而不是按 `.venv` 选：Claude Code 的 cache 里可能同时留多个版本（旧版残留 + 新版），旧版往往已建好 `.venv`、新版还没建——按 `.venv` 选会选到 stale 旧版（实测：1.2.2 有 venv、1.3.0 没有，就错选了 1.2.2，导致一堆已修 bug 被当成新 bug 报）。读 `plugin.json` 的 `version` 取最大，永远选最新装的那份；`.venv` 由 hook/fallback 在那份上建。同时排除 `marketplaces/`（源克隆，不运行），避免和 `cache/` 混。
+> 为什么读 `plugin.json` 版本而不是按 `.venv` 选：Claude Code 的 cache 里可能同时留多个版本（旧版残留 + 新版），旧版往往已建好 `.venv`、新版还没建——按 `.venv` 选会选到 stale 旧版（实测：1.2.2 有 venv、1.3.0 没有，就错选了 1.2.2，导致一堆已修 bug 被当成新 bug 报）。读 `plugin.json` 的 `version` 取最大，永远选最新装的那份；`.venv` 由 hook/fallback 在那份上建。同时排除 `marketplaces/`（源克隆，不运行），避免和 `cache/` 混。fresh-test run8 后再加一条：**也跳过带 `.orphaned_at` 的副本**（已被新版本顶替、即将清理的旧版——run8 曾选中正被顶替的 1.5.4 跑完整轮）。另：若上面选出的代码版本（`v$best`）和你**这份 SKILL.md 所在路径里的版本号**不一致，是 harness 的 Skill 工具注入了旧版 SKILL.md（代码新版、文档旧版）——**重启会话**让 Skill 工具加载最新版即可，别在新旧不一致的状态下跑。
 
 看到 `✓ 环境就绪` 就直接进第一步。**如果 `$P/.venv` 不存在**（hook 没跑成，比如 python3 缺失），fallback 手动建一次：
 ```bash
@@ -162,7 +164,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 
 ### 复核时怎么判断
 
-复核 agent 用的就是第三步那条**基数规则**（一对一/一对多可以、多对一不行；培养模式标签永远不算身份；中外合作/师范/性别/类别/真方向在一对多时被吸收、一对一时才算不同专业）。每条复核任务的 `requirement` 字段会**按「往年同核心几个」自动给出对应那版的规则**（程序已数好往年同核心数），照着判就行：
+复核 agent 用的就是第三步那条**基数规则**（一对一/一对多可以、多对一不行；培养模式标签永远不算身份；中外合作/师范/性别/类别/学制/独立划线校区/真方向在一对多时被吸收、一对一时才算不同专业）。每条复核任务的 `requirement` 字段会**按「往年同核心几个」自动给出对应那版的规则**（程序已数好往年同核心数），照着判就行：
 
 - 往年同核心只 1 个 → 今年任何校内变体都判「确认」（一对多）。
 - 往年同核心多个 → 培养模式标签差异判「确认」；中外合作/师范/招生类别/真方向实质不同判「存疑」。
