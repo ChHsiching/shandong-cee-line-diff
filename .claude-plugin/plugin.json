@@ -1,10 +1,22 @@
 {
   "name": "shandong-cee-line-diff",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "description": "山东高考录取数据整理——把今年的大绿本招生计划和往年录取线差按专业匹配，给每个专业补上线差和标准差。Annual reuse; auto-asks 一段线/scope.",
   "author": { "name": "ChHsiching" },
   "homepage": "https://github.com/ChHsiching/shandong-cee-line-diff",
   "repository": "https://github.com/ChHsiching/shandong-cee-line-diff",
   "license": "MIT",
-  "keywords": ["shandong", "cee", "gaokao", "admission", "line-diff", "大绿本"]
+  "keywords": ["shandong", "cee", "gaokao", "admission", "line-diff", "大绿本"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-env.sh\""
+          }
+        ]
+      }
+    ]
+  }
 }

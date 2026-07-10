@@ -113,7 +113,7 @@ PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --ou
 
 ## 怎么跑 pipeline（开箱即用）
 
-plugin **不**自动建 venv。首次定位到 plugin 根 $P 后，若 `$P/.venv` 不存在，按下面 fallback 手动建一次（只首次）；之后开箱即用。
+**Claude Code**：plugin 的 SessionStart hook（`plugin.json` 的 `hooks` 字段 → `hooks/setup-env.sh`）新会话自动建好 Python venv + openpyxl（plugin 根 `.venv`），agent 不用自己建。**其他工具 / 万一 hook 没建好**：按下面 fallback 手动建一次（首次）。
 
 定位 plugin 根 $P（含 scripts/ + .venv）：
 ```bash
