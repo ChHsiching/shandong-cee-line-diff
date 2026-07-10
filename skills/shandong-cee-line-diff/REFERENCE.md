@@ -145,14 +145,14 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 3. **第二次跑管线**（apply 改名 → 重生成改名感知 batch）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → 旧校名 history 并入新校名，**改名校的专业这次有候选了**，Stage2 batch prompt 重新生成（改名感知）。
-4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`（自带 `matching_rule`），每批派 subagent（**并发 ≤6**，多了触发 429）。结果**用 helper 写、不手写 JSON**：agent 每条判写成 TSV `src_row_idx<TAB>cand_index(0起/-)<TAB>reason` 存 `decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode batch --prompt semantic-match/batch_NN_prompt.json --decisions semantic-match/decisions_NN.tsv --out semantic-match/batch_NN_result.jsonl`（helper 反填 match/J/T，消除双引号/弯引号转义坑）。
+4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`（自带 `matching_rule`），每批派 subagent（**并发按 SKILL「自适应并发（AIMD）」调——起点 8、撞 429 ÷2 重派、全成 +2 上限 10，别写死 6**）。结果**用 helper 写、不手写 JSON**：agent 每条判写成 TSV `src_row_idx<TAB>cand_index(0起/-)<TAB>reason` 存 `decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode batch --prompt semantic-match/batch_NN_prompt.json --decisions semantic-match/decisions_NN.tsv --out semantic-match/batch_NN_result.jsonl`（helper 反填 match/J/T，消除双引号/弯引号转义坑）。
 5. **第三次跑管线**（apply 语义结果）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → apply batch_*_result.jsonl。**注意：run_pipeline 不产出 verify prompt**——下一步单独跑。
 6. **产出 verify prompt**（独立步骤，run_pipeline 不代劳，**别漏**）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_stage_verify_prep --data-dir data --out-dir output --semantic-dir semantic-match`
    → 抽判断型匹配 + 往年同核心数，写 `semantic-match/verify_batch_NN.json`（每 item 自带 `requirement`）。
-7. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`（每 item 的 `requirement`），派 subagent（并发 ≤6）。结果用 helper 写：TSV `src_row_idx<TAB>verdict(确定/存疑)<TAB>reason` 存 `verify_decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode verify --prompt semantic-match/verify_batch_NN.json --decisions semantic-match/verify_decisions_NN.tsv --out semantic-match/verify_batch_NN_result.jsonl`。
+7. **派 agent 跑二次复核**：读 `semantic-match/verify_batch_NN.json`（每 item 的 `requirement`），派 subagent（并发同上自适应，见 SKILL「自适应并发」）。结果用 helper 写：TSV `src_row_idx<TAB>verdict(确定/存疑)<TAB>reason` 存 `verify_decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode verify --prompt semantic-match/verify_batch_NN.json --decisions semantic-match/verify_decisions_NN.tsv --out semantic-match/verify_batch_NN_result.jsonl`。
 8. **第四次跑管线**（apply 复核结果，产出最终 8 张表）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
 9. **跑审计**：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output --output-dir output --data-dir data --semantic-dir semantic-match`（exit 0 才算完成）。
