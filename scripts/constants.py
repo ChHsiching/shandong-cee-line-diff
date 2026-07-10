@@ -94,8 +94,15 @@ IGNORE_BRACKET_KEYWORDS: tuple[str, ...] = (
 # --- Match log strings (大白话) ----------------------------------------------
 LOG_STRICT = "严格匹配：归一化后专业名完全一致"
 
-# Stage 1.5 candidate-generation log (prefix：detail format for parser)
-LOG_COARSE_CANDIDATE = "核心名匹配：核心专业名相同"
+# Stage 1.5 candidate-generation log (prefix：detail format for parser).
+# 备注要让没有前置知识的人也能看懂前因后果（用户口径 2026-07-09：别冷不丁甩
+# 一句黑话）。「核心名匹配」是 stage 前缀（structured_log 按首个「：」切分），
+# 冒号后是给读者看的因果说明：同校、核心名相同、往年只此一条→直接沿用线差。
+LOG_COARSE_CANDIDATE = (
+    "核心名匹配：今年该专业与往年同校某条记录的核心名相同"
+    "（核心名=去掉方向、校区等括号后的专业主干名），"
+    "且往年只有这一条记录，按规则直接沿用它的线差"
+)
 
 # 选科跨年差异标注
 LOG_SUBJECT_NOTE = "选科要求跨年不同，不影响匹配"

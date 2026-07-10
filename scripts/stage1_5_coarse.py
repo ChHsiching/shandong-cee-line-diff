@@ -190,17 +190,34 @@ def match_coarse(
             if _core_compatible(dl_core, h.get("core", ""))
         ]
         if len(any_cat) == 1:
-            # 备注要让没前置知识的人也能看懂前因后果。
+            # 备注要让没前置知识的人也能看懂前因后果。这条「同类别精确核心没配上、
+            # 退到同校任意类别只找到一条」的回退，实际含两种情况，要分开设注——
+            # 全量审计 2026-07-10 发现 69 条同类别的大类↔具体被一刀切标成「跨类别」。
+            mh = any_cat[0]
             dl_major = d.get("major", "") or ""
             dl_cat = d.get("school_cat", "") or ""
-            note = "（跨类别一对多）"
+            cats_differ = normalise_cat(mh.get("school_cat", "")) != normalise_cat(dl_cat)
+            if cats_differ:
+                # (a) 真跨类别：今年普通批、往年只招过中外合作等（类别不同=口径不同）
+                note = (
+                    "（注：今年与往年的招生类别不同，例如今年普通批、往年只招过中外合作；"
+                    "同校该专业往年只有这一条记录，按规则仍把它的线差作为参考填入）"
+                )
+            else:
+                # (b) 同类别、核心名是大类↔具体（如 化学↔化学类）：类别并未不同，
+                #     只因精确核心名没对上才走到这里（past=1 回退用 _core_compatible）。
+                note = (
+                    "（注：今年该专业与往年记录的核心名属大类↔具体关系"
+                    "（如「化学」对「化学类」），招生类别相同；"
+                    "同校往年只有这一条记录，按规则沿用它的线差）"
+                )
             if "综合评价" in dl_major or "综合评价" in dl_cat:
                 note += (
                     "；今年是综合评价招生=高考分+大学校测+学业考复合录取，"
                     "往年该校只有普通批=纯高考分录取，两类分数线差口径不同，"
                     "此处填的是普通批的线差、仅作参考，不等于综合评价的真实门槛"
                 )
-            accepted.append(_accept(d, any_cat[0], LOG_COARSE_CANDIDATE + note))
+            accepted.append(_accept(d, mh, LOG_COARSE_CANDIDATE + note))
             continue
 
         # 0 或 2+ → Stage 2 agent（旧 multi-candidate bracket-subset 消歧已停用）

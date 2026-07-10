@@ -28,7 +28,6 @@ from typing import Iterable, Sequence
 
 from scripts.constants import (
     LOG_SEMANTIC_PREFIX,
-    LOG_COARSE_CANDIDATE,
     LOG_VERIFY_DEMOTE_PREFIX,
 )
 from scripts.models import DaglubenRow, HistoryRow, MatchResult, VerifyApplyResult
@@ -49,10 +48,13 @@ __all__ = [
     "DEMOTE_LOG_PREFIX",
 ]
 
-# Logs marking a match as 判断型 (needs second-pass verification, V5-0).
-# Strict-exact (LOG_STRICT) is构造确定 and excluded.
+# 阶段前缀（首个「：」之前）标记一条匹配为判断型（需 V5-0 二次复核）。按阶段前缀
+# 而非整条 log 文本识别——这样冒号后给读者看的因果说明就能自由改进（见
+# LOG_COARSE_CANDIDATE 的详细备注）而不破坏识别。严格匹配（LOG_STRICT）是构造
+# 确定，已排除。「核心名匹配」#5 后 pipeline 不再送复核（past=1 构造确定），此处
+# 保留识别是为兼容旧 jsonl/测试。
 JUDGMENT_LOG_PREFIXES: tuple[str, ...] = (
-    LOG_COARSE_CANDIDATE,  # 核心名匹配（#5 后 pipeline 不产生；保留兼容旧 jsonl/测试）
+    "核心名匹配",  # 核心名匹配的阶段前缀（LOG_COARSE_CANDIDATE 冒号前那段）
     LOG_SEMANTIC_PREFIX,  # agent 语义匹配 (matched)
 )
 
@@ -152,7 +154,7 @@ def is_judgmental(match: MatchResult) -> bool:
     if not match.get("matched"):
         return False
     log = match.get("log", "")
-    return any(log.startswith(p) for p in JUDGMENT_LOG_PREFIXES)
+    return any(log.startswith(f"{p}：") for p in JUDGMENT_LOG_PREFIXES)
 
 
 def _requirement_text(

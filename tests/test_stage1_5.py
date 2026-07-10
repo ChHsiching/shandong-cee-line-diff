@@ -21,6 +21,7 @@ from pathlib import Path
 
 
 from scripts import stage0_merge, stage1_5_coarse, stage1_strict
+from scripts.constants import LOG_COARSE_CANDIDATE
 from scripts.models import DaglubenRow, HistoryRow
 
 
@@ -120,7 +121,7 @@ def test_match_coarse_unique_candidate_auto_accepts():
     assert r["src_row_idx"] == 10
     assert r["J"] == 72.0
     assert r["T"] == 4.0
-    assert r["log"] == "核心名匹配：核心专业名相同"
+    assert r["log"] == LOG_COARSE_CANDIDATE
 
 
 def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
@@ -150,7 +151,7 @@ def test_match_coarse_unique_candidate_does_not_require_full_name_equality():
     ]
     accepted, _ = stage1_5_coarse.match_coarse(unmatched, core_idx)
     assert len(accepted) == 1
-    assert accepted[0]["log"] == "核心名匹配：核心专业名相同"
+    assert accepted[0]["log"] == LOG_COARSE_CANDIDATE
     assert accepted[0]["J"] == 80.0
 
 
