@@ -532,3 +532,27 @@ def test_apply_results_multi_year_history_does_not_add_note(tmp_path: Path) -> N
     results = apply_results([jsonl], dagluben, history)
     assert results[0]["matched"] is True
     assert SINGLE_YEAR_NOTE_STAGE2 not in results[0]["log"]
+
+
+def test_apply_collects_all_violations_not_just_first(tmp_path: Path) -> None:
+    """collect-and-report（反馈回路）：多处契约违反收齐后一次性报全，不是第一条中断。
+
+    fresh-test 2026-07-10 §6.7：旧版第一条就 raise、apply 永远只看到 1 条，
+    消费方要 monkeypatch 才能拿到全量。现在收齐再报，让调用方一次看清
+    （系统性代码 bug vs 个别 agent 误判）——别被第一条逼到改源码的死角。
+    """
+    dagluben = [
+        _dl(1, "甲大学", "计算机类(图灵)", "计算机类"),
+        _dl(2, "甲大学", "计算机类(网络)", "计算机类"),
+    ]
+    history = [_hist("甲大学", "计算机类", "计算机类", 80.0)]
+    # 两条都是 agent 胡编（match 不在候选集）——旧版只报第一条，新版两条都收。
+    jsonl = _write(
+        tmp_path,
+        [_line(1, "量子力学", "越界一"), _line(2, "天体物理", "越界二")],
+    )
+    with pytest.raises(Stage2ContractError) as exc:
+        apply_results([jsonl], dagluben, history)
+    msg = str(exc.value)
+    assert "2 处" in msg                       # 计数：收齐了 2 条
+    assert "量子力学" in msg and "天体物理" in msg  # 两条都在，不是只报第一条

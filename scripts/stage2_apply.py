@@ -274,14 +274,18 @@ def apply_results(
     """Read agent result jsonl files and back-fill MatchResult rows.
 
     Order of returned rows follows first-appearance order across the input
-    files (so a stable input order yields a stable output). Raises
-    :class:`Stage2ContractError` on the first contract violation.
+    files (so a stable input order yields a stable output). Raises a single
+    :class:`Stage2ContractError` **aggregating every** contract violation
+    found across all files (collect-and-report), not on the first — so the
+    caller sees the full picture (systemic code bug vs a few agent misjudgments)
+    and can fix-and-rerun instead of being cornered into patching source.
     """
     dagluben_by_idx: dict[int, DaglubenRow] = {
         d.get("src_row_idx", 0): d for d in dagluben
     }
     seen_idx: set[int] = set()
     results: list[MatchResult] = []
+    errors: list[str] = []  # 收齐所有契约违反，最后一次性报（反馈回路，非第一条中断）
 
     for path in result_jsonl_paths:
         path = Path(path)
@@ -289,11 +293,24 @@ def apply_results(
         for lineno, raw in enumerate(text.splitlines(), start=1):
             if raw.strip() == "":
                 continue
-            obj = _parse_line(raw, path, lineno)
-            results.append(
-                _validate_and_build(
-                    obj, path, lineno, dagluben_by_idx, history, seen_idx
+            try:
+                obj = _parse_line(raw, path, lineno)
+                results.append(
+                    _validate_and_build(
+                        obj, path, lineno, dagluben_by_idx, history, seen_idx
+                    )
                 )
-            )
+            except Stage2ContractError as e:
+                errors.append(str(e))
 
+    if errors:
+        # 收齐再报：让调用方一次看到全部问题，据此修匹配决策再重跑——而不是被
+        # 第一条错误逼到「改 plugin 源码」的死角（best practice：solve-don't-punt
+        # + 可校验中间产物的反馈回路；fresh-test 2026-07-10 §6.7）。
+        preview = errors[:30]
+        tail = f"\n…（共 {len(errors)} 条，仅显示前 30 条）" if len(errors) > 30 else ""
+        raise Stage2ContractError(
+            f"apply 收到 {len(errors)} 处契约违反（已全部收集，非第一条中断）：\n"
+            + "\n".join(preview) + tail
+        )
     return results

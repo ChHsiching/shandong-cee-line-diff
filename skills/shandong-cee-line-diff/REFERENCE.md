@@ -134,7 +134,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 
 ## 管线串联命令
 
-跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）。**所有命令加 `PYTHONPATH=$P` 前缀**（见上「怎么跑 pipeline」）。
+跑一次完整整理要串联确定性管线 + agent 派发（agent / WebSearch 是 harness 侧，Python 不能调）。**所有命令加 `PYTHONPATH=$P` 前缀**（见上「怎么跑 pipeline」）。这些 `scripts/` 是确定性引擎（低自由度）：**只按下面命令原样运行，不要改 plugin 里的代码**；撞到崩溃或 `Stage2ContractError`（会把全部问题收齐报全）= skill bug，**如实把完整错误清单交开发者、不要就地改源码绕过**（详见 SKILL「脚本使用约定」）。允许调整的只有数据口径，用 CLI 参数传。
 
 **关键顺序：改名必须早于语义匹配**——改名校的专业在改名前的 batch 里会拿到空候选（旧校名 history 还没并入新校名）。所以先派改名 agent、apply 后重生成 batch，再派语义 agent。
 

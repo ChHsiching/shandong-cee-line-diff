@@ -51,6 +51,8 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 
 **之后所有 pipeline / audit / show_table 命令用 `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.<模块>`**（$P 是上面输出的 PLUGIN_ROOT——记住它，后面每条命令都要用）。数据年年变时通过 CLI 参数覆盖（`--dl-file` / `--one-line` / `--supplement-batches` 等），不用改代码。
 
+> **脚本使用约定（低自由度——这是硬约束，不是建议）**：`scripts/` 是**确定性引擎**：严格匹配 / 核心名匹配 / 线差 / 标准差 / 审计都是脆弱、要求每次精确一致的逻辑，所以写成代码让你**直接按上面的命令运行**，而不是用自然语言每次重新实现。因此：**只运行，不修改** plugin 里的这些代码。撞到崩溃或 `Stage2ContractError`（它会把所有问题收齐了一次报全），那是 **skill 的 bug**——**如实把完整错误清单记录下来交开发者**，**不要就地改 plugin 源码绕过**（一改下次 plugin 更新就丢，还会掩盖真正的根因；fresh-test run7 就因为改了缓存源码差点漏判）。允许你调整的只有数据口径，用 CLI 参数（`--dl-file` 等）传；其余按命令原样跑。
+
 ---
 
 ## 第一步：确认数据 + 自动默认
