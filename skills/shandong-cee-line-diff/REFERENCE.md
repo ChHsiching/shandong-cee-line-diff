@@ -113,7 +113,7 @@ PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --ou
 
 ## 怎么跑 pipeline（开箱即用）
 
-plugin 自带 SessionStart hook，**新开 session 自动建好 Python venv + openpyxl**（在 plugin 根 `.venv`）。agent 不用自己建 venv。
+plugin **不**自动建 venv。首次定位到 plugin 根 $P 后，若 `$P/.venv` 不存在，按下面 fallback 手动建一次（只首次）；之后开箱即用。
 
 定位 plugin 根 $P（含 scripts/ + .venv）：
 ```bash
@@ -127,7 +127,7 @@ PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --ou
 
 查任何产出 xlsx：`PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.show_table output/<表>.xlsx --head 20`
 
-**如果 `$P/.venv` 不存在**（hook 没跑成，如 python3 缺失），fallback 手动建一次：
+**如果 `$P/.venv` 不存在**，手动建一次（首次）：
 ```bash
 python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 ```
