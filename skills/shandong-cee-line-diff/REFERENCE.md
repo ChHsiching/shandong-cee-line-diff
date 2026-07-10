@@ -145,7 +145,7 @@ python3 -m venv "$P/.venv" && "$P/.venv/bin/pip" install -q openpyxl
 3. **第二次跑管线**（apply 改名 → 重生成改名感知 batch）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → 旧校名 history 并入新校名，**改名校的专业这次有候选了**，Stage2 batch prompt 重新生成（改名感知）。
-4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`（自带 `matching_rule`），每批派 subagent（**并发按 SKILL「自适应并发（AIMD）」调——起点 8、撞 429 ÷2 重派、全成 +2 上限 10，别写死 6**）。结果**用 helper 写、不手写 JSON**：agent 每条判写成 TSV `src_row_idx<TAB>cand_index(0起；配不上用 - 或空，不是 -1)<TAB>reason` 存 `decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode batch --prompt semantic-match/batch_NN_prompt.json --decisions semantic-match/decisions_NN.tsv --out semantic-match/batch_NN_result.jsonl`（helper 反填 match/J/T，消除双引号/弯引号转义坑）。
+4. **派 agent 跑语义匹配**：读新生成的 `semantic-match/batch_NN_prompt.json`（自带 `matching_rule`），每批派 subagent（**并发按 SKILL「自适应并发（AIMD）」调——起点 6、撞 429 ÷2 重派、全成 +2 上限 10**）。结果**用 helper 写、不手写 JSON**：agent 每条判写成 TSV `src_row_idx<TAB>cand_index(0起；配不上用 - 或空，不是 -1)<TAB>reason` 存 `decisions_NN.tsv`，再 `python -m scripts.write_batch_result --mode batch --prompt semantic-match/batch_NN_prompt.json --decisions semantic-match/decisions_NN.tsv --out semantic-match/batch_NN_result.jsonl`（helper 反填 match/J/T，消除双引号/弯引号转义坑）。
 5. **第三次跑管线**（apply 语义结果）：
    `PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.run_pipeline --data-dir data --out-dir output --semantic-dir semantic-match --with-agent-results`
    → apply batch_*_result.jsonl。**注意：run_pipeline 不产出 verify prompt**——下一步单独跑。
