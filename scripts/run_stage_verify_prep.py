@@ -47,6 +47,12 @@ def main() -> int:
         help="Directory for agent prompts/results (default: semantic-match)",
     )
     parser.add_argument(
+        "--intermediate-dir",
+        type=Path,
+        default=Path("intermediate"),
+        help="(accepted for parity with run_pipeline; unused here — verify prep writes no intermediate)",
+    )
+    parser.add_argument(
         "--no-agent-results",
         action="store_true",
         help="Do not apply batch_*_result.jsonl when extracting judgmental "
