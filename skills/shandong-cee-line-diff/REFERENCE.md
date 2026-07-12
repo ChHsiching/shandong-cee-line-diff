@@ -75,7 +75,7 @@ PYTHONPATH=$P "$P/.venv/bin/python" -m scripts.audit_output \
     --intermediate-dir intermediate --semantic-dir semantic-match
 ```
 
-exit 0 才算完成。**实际检查（`audit_output.py` 共 5 项）**：
+exit 0 才算完成。**实际检查（`audit_output.py` 共 6 项）**：
 
 | check | 说明 |
 |------|------|
@@ -84,8 +84,9 @@ exit 0 才算完成。**实际检查（`audit_output.py` 共 5 项）**：
 | `no_empty_rows` | 每张产出表没有全空行 |
 | `tables_nonempty` | 每张产出表至少 1 行数据 |
 | `jt_consistency` | 匹配到的线差 / 标准差与往年源数据一致（容差 0.011） |
+| `rename_official_link` | 改名表每行含官方来源链接（moe.gov.cn / gov.cn / .edu.cn）；缺链接 = 网查没做或没留证（run13 第一版「链接待补」就漏过，1.7.1 加这项自动抓） |
 
-> **以下尚未实现审计**（fresh-test 2026-07-08 痛点 4 指出，待补）：① 每个消失 / 新增校有网查记录（改名表 `is_rename=true` 行备注非空且含官方链接）；② 核心专业名列无残留括号；③ 未能匹配表不该有大类变体残留（X / X类，待 OPP-1 domain policy 定了再加）。目前靠 agent 自查 + 改名表 `note` 直填备注保证。
+> **以下尚未实现审计**（fresh-test 2026-07-08 痛点 4 指出，待补）：① 核心专业名列无残留括号；② 未能匹配表不该有大类变体残留（X / X类，待 domain policy 定了再加）。
 
 ## run_pipeline CLI 参数（覆盖默认，不特化数据）
 

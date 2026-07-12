@@ -197,7 +197,7 @@ def _good_output_dir(tmp_path: Path) -> Path:
     _write_edge(
         out / "学校改名表.xlsx",
         ["2026新校名", "候选旧校名", "置信度", "2026本科专业数", "备注", "人工已核验"],
-        [["新校", "旧校", 0.9, 5, "前身旧校", False]],
+        [["新校", "旧校", 0.9, 5, "前身旧校，教育部批复 http://www.moe.gov.cn/x", False]],
     )
     _write_edge(
         out / "今年新招生的学校.xlsx",
@@ -583,6 +583,34 @@ def test_audit_writes_sample_xlsx(tmp_path: Path) -> None:
     rows = list(ws.iter_rows(values_only=True))
     wb.close()
     assert len(rows) >= 2
+
+
+def test_check5_rename_official_link_passes_with_link(tmp_path: Path) -> None:
+    """改名表每行含官方链接(moe/gov/edu) → check5 过。"""
+    out = _good_output_dir(tmp_path)
+    sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
+    report = audit(out, data_dir=_good_data_dir(tmp_path),
+                   intermediate_dir=_good_intermediate_dir(tmp_path), semantic_dir=sem)
+    c5 = [c for c in report.checks if c["name"] == "rename_official_link"]
+    assert len(c5) == 1
+    assert c5[0]["passed"] is True
+
+
+def test_check5_rename_official_link_fails_when_link_missing(tmp_path: Path) -> None:
+    """改名表某行备注无官方链接 → check5 挂（run13 第一版「链接待补」就漏过了）。"""
+    out = _good_output_dir(tmp_path)
+    # 把改名表备注改成无链接
+    wb = openpyxl.load_workbook(out / "学校改名表.xlsx")
+    ws = wb.active
+    ws.cell(row=2, column=5, value="前身旧校，链接待补")  # 备注，无 moe/gov/edu
+    wb.save(out / "学校改名表.xlsx")
+    sem = _good_semantic_dir(tmp_path, confirmed_idx=[3])
+    report = audit(out, data_dir=_good_data_dir(tmp_path),
+                   intermediate_dir=_good_intermediate_dir(tmp_path), semantic_dir=sem)
+    c5 = [c for c in report.checks if c["name"] == "rename_official_link"]
+    assert len(c5) == 1
+    assert c5[0]["passed"] is False
+    assert "缺官方链接" in c5[0]["detail"]
 
 
 # --- main() exit code contract ---------------------------------------------

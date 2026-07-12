@@ -474,6 +474,51 @@ def _write_sample(hier_rows: list[tuple], out_path: Path, seed: int = 20260623) 
     return len(sample)
 
 
+# 官方来源域名（不认第三方百科/新闻）。run13 fresh-test：agent 第一版「链接待补」
+# 照样过审计 → 加这项自动抓「is_rename=true 行缺官方链接」。
+_OFFICIAL_LINK_MARKERS = ("moe.gov.cn", "gov.cn", ".edu.cn")
+
+
+def _check5_rename_official_link(out_dir: Path) -> AuditCheck:
+    """改名表每一行都必须含官方来源链接（moe.gov.cn / gov.cn / .edu.cn）。
+
+    改名是 agent 网查判的、note 直填备注列；用户看改名依据只靠这一列。缺链接
+    = 网查没做或没留证 → 审计拦下（run13 第一版「链接待补」就漏过了）。
+    列名不固定（新旧版表头不同），所以扫**整行所有单元格**找链接，更稳。
+    """
+    name = "rename_official_link"
+    rename_path = out_dir / RENAME_NAME
+    if not rename_path.exists():
+        return {"name": name, "passed": True, "detail": "无改名表（无改名校）"}
+
+    wb = openpyxl.load_workbook(rename_path, read_only=True, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    if len(rows) <= 1:  # 仅表头 / 空
+        return {"name": name, "passed": True, "detail": "改名表无数据行"}
+
+    missing: list[str] = []
+    for row_idx_0, row in enumerate(rows[1:], start=2):  # 数据行，2-based
+        cells = [str(c) for c in row if c is not None]
+        joined = " ".join(cells)
+        if not any(marker in joined for marker in _OFFICIAL_LINK_MARKERS):
+            # 报新校名（第 1 列）方便定位
+            new_school = cells[0] if cells else f"行{row_idx_0}"
+            missing.append(new_school)
+    if missing:
+        return {
+            "name": name,
+            "passed": False,
+            "detail": f"改名表 {len(missing)} 行缺官方链接(moe/gov/edu)：{missing[:5]}",
+        }
+    return {
+        "name": name,
+        "passed": True,
+        "detail": f"改名表 {len(rows) - 1} 行均含官方来源链接",
+    }
+
+
 # ---------------------------------------------------------------------------
 # audit
 # ---------------------------------------------------------------------------
@@ -487,7 +532,7 @@ def audit(
     history: Sequence[dict[str, Any]] | None = None,
     semantic_dir: str | Path | None = None,
 ) -> AuditReport:
-    """Run the five V5-3 data-quality checks over ``output_dir``.
+    """Run the six data-quality checks over ``output_dir``.
 
     Parameters
     ----------
@@ -541,6 +586,7 @@ def audit(
     if nm_path.exists():
         new_major_rows = _load_rows(nm_path)
     checks.append(_check4_jt_consistency(hier_rows, hist, new_major_rows))
+    checks.append(_check5_rename_official_link(out_dir))
 
     # Human-review sample (does NOT affect ok).
     try:
