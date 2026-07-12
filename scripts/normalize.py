@@ -30,6 +30,7 @@ __all__ = [
     "strip_ignore_brackets",
     "core_of",
     "diff_brackets",
+    "infer_cat_from_major",
 ]
 
 # A bracket group is (...) — after nfk, full-width parens are already half-width.
@@ -38,6 +39,34 @@ _BRACKET_RE = re.compile(r"\(([^()]*)\)")
 _GENDER_RE = re.compile(
     r"^[男女]$|^[男女][,，、]|[,，、][男女]$|[,，、][男女][,，、]|招[男女]生"
 )
+
+# 往年常把招生类别塞在专业名里（校名里没有），如「物理学(省属公费师范生,面向
+# 临沂就业)」「金融学(地方专项计划)」。这些是会在专业名里出现的完整身份标记，
+# infer_cat_from_major 用它把身份从专业名认出来、补进 school_cat（让同身份匹配
+# 成立——否则公费生会因 school_cat 空而配不上）。
+MAJOR_CAT_MARKERS: tuple[str, ...] = (
+    "省属公费师范生",
+    "省属公费医学生",
+    "省属公费农科生",
+    "国家公费师范生",
+    "地方专项计划",
+    "高校专项计划",
+    "综合评价招生",
+    "中外合作办学",
+)
+
+
+def infer_cat_from_major(major: str) -> str:
+    """Return the 招生类别 marker embedded in ``major`` if any, else ``""``.
+
+    往年表把身份写在专业名里、校名里没有 → split_school 给出的 school_cat 是空。
+    用这个从专业名补全，让「同身份匹配」成立（公费师范生 ↔ 公费师范生）。
+    匹配第一个命中的标记（这些标记互不重叠，先后无歧义）。
+    """
+    for kw in MAJOR_CAT_MARKERS:
+        if kw in (major or ""):
+            return kw
+    return ""
 
 
 def nfk(s: str) -> str:

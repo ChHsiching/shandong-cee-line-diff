@@ -58,21 +58,20 @@ class Stage2ContractError(ValueError):
 
 def _candidate_set(dagluben: DaglubenRow, history: Sequence[HistoryRow]) -> set[str]:
     """The set of近三年 major strings the agent was allowed to pick from for
-    this dagluben row. Must mirror :func:`scripts.stage2_agent.build_batches`'
-    candidate logic: 同类别同核心；为空则跨类别回退（同校任意类别）。"""
+    this dagluben row. Must mirror :func:`scripts.stage2_agent.build_batches`:
+    **同招生类别**同核心（招生类别是硬身份，不同类别不会进 agent batch）。"""
     dl_school = dagluben.get("school", "")
     dl_cat = normalise_cat(dagluben.get("school_cat", ""))
     dl_core = dagluben.get("core", "")
     same_cat: set[str] = set()
-    any_cat: set[str] = set()
     for h in history:
         if h.get("school", "") != dl_school:
             continue
-        if _core_compatible(dl_core, h.get("core", "")):
-            any_cat.add(h.get("major", ""))
-            if normalise_cat(h.get("school_cat", "")) == dl_cat:
-                same_cat.add(h.get("major", ""))
-    return same_cat if same_cat else any_cat  # 跨类别回退（与 build_batches 一致）
+        if _core_compatible(dl_core, h.get("core", "")) and (
+            normalise_cat(h.get("school_cat", "")) == dl_cat
+        ):
+            same_cat.add(h.get("major", ""))
+    return same_cat
 
 
 def _subject_drift_note(dagluben: DaglubenRow, matched: HistoryRow | None) -> str:
@@ -102,29 +101,23 @@ def _find_matched(
 ) -> HistoryRow | None:
     """Locate the history row the agent chose (major == match_major).
 
-    **镜像 :func:`_candidate_set`**：同类别有候选则只认同类别，否则跨类别回退
-    （省属公费生 history school_cat 常空、大绿本显式类别——_candidate_set 让 agent
-    选了它，这里必须也能定位，否则 apply 报「通过候选集但无法定位历史行」崩溃）。
-
-    同名多行（如飞行技术不同送培航司 J/T 不同）→ 用结果 J/T（来自 agent 选中的候选）
-    唯一定位，避免取到相邻同名行。Returns None if no match."""
+    **镜像 :func:`_candidate_set`**：只在**同招生类别**同核心里找（招生类别是硬
+    身份，build_batches 只喂同类别候选给 agent，agent 选的必是同类别）。同名多行
+    （如飞行技术不同送培航司 J/T 不同）→ 用结果 J/T（agent 选中的候选）唯一定位，
+    避免取到相邻同名行。Returns None if no match."""
     dl_school = dagluben.get("school", "")
     dl_cat = normalise_cat(dagluben.get("school_cat", ""))
     dl_core = dagluben.get("core", "")
-    same_rows: list[HistoryRow] = []
-    any_rows: list[HistoryRow] = []
-    same_cat_exists = False
+    pool: list[HistoryRow] = []
     for h in history:
         if h.get("school", "") != dl_school:
             continue
         if not _core_compatible(dl_core, h.get("core", "")):
             continue
-        is_same = normalise_cat(h.get("school_cat", "")) == dl_cat
-        if is_same:
-            same_cat_exists = True
+        if normalise_cat(h.get("school_cat", "")) != dl_cat:
+            continue  # 只认同类别（mirror build_batches/_candidate_set）
         if h.get("major", "") == match_major:
-            (same_rows if is_same else any_rows).append(h)
-    pool = same_rows if same_cat_exists else any_rows  # mirror _candidate_set
+            pool.append(h)
     if not pool:
         return None
     if exp_j is not None:

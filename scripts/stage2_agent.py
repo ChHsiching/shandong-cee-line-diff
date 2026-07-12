@@ -77,12 +77,18 @@ MATCHING_RULE: str = (
     "特别强调**一对多**: 一个往年候选可以被**多个**今年专业各自选中（往年同核心只"
     " 1 条、今年拆成多个变体时常见）——「这个候选已被同 batch 别的 item 配过」**不"
     "是**配 null 的理由；每个 item 独立按对应关系判, 别管别的 item 选了什么。"
-    "永远不算身份(对得上就配): 培养模式标签(拔尖/卓越/创新/英才/基地/未来/试验"
-    "班/订单班等「XX 班」)、出国模式(中澳/中俄/1+3 等)、描述性噪音(标点/词序/"
-    "体检/学费/语种/子专业清单长描述)。"
-    "一对一时算不同专业(挑不到对应→null): 中外合作、师范、性别(男/女)、招生类别"
-    "(普通/地方专项/高校专项/综合评价)、学制(5年制≠5+3一体化≠8年制, 各自独立分数线)、"
-    "真正不同的方向(如投资学(量化投资)≠投资学)。"
+    "身份由数据定、不靠标签: 往年这学校这核心有**几条记录就是几个单独招生的"
+    "专业**（各有独立分数线）——你看到的候选都是往年单独招过的不同专业, 任务是"
+    "按今年专业实际描述 1:1 精配到语义真正对应的那 1 条; 挑不出真正对应的配 null。"
+    "括号里这些都是区分不同专业的标志(往年分了多条线招, 就别合并到 plain): "
+    "培养标签班(拔尖/卓越/创新/英才/基地/未来/试验班/订单班等「XX 班」)、出国"
+    "模式(中澳/中俄/1+3)、师范、性别(男/女)、学制(5年制≠5+3一体化≠8年制)、"
+    "独立划线校区、真正不同的方向(如投资学(量化投资)≠投资学)。"
+    "只有**纯描述噪音**不算身份(它是同一个专业的说明文字、不是单独招生标记): "
+    "标点/词序/体检/色盲/学费/语种/章程引用/子专业清单长描述。"
+    "注: 招生类别(普通/地方专项/高校专项/综合评价)和中外合作程序已按同类别预筛"
+    "——你看到的候选都是**同招生类别**的, 不同类别的不"
+    "会到你手里(它们走 past=1 一对多兜底或「未能匹配」估算)，故不用再判类别。"
     "大类↔具体(X↔X类，经济学↔经济学类、护理学↔护理类): 算同核心, 配(大类线差作参考);"
     "工科试验班类这种混杂宽大类除外(挑不出→null)。"
     "省属公费师范生/医学生/农科生 的「面向X市就业」是身份——不同市就是不同专业"
@@ -116,12 +122,6 @@ class Batch:
     items: list[BatchItem]
 
 
-def _same_school_cat(dl: DaglubenRow, h: HistoryRow) -> bool:
-    return dl.get("school", "") == h.get("school", "") and normalise_cat(
-        dl.get("school_cat", "")
-    ) == normalise_cat(h.get("school_cat", ""))
-
-
 def _core_compatible(dl_core: str, h_core: str) -> bool:
     """Core-name pre-filter: exact, or **X ↔ X类**（大类↔具体）.
 
@@ -136,25 +136,20 @@ def _core_compatible(dl_core: str, h_core: str) -> bool:
     return dl_core + "类" == h_core or h_core + "类" == dl_core
 
 
-def _is_candidate(dl: DaglubenRow, h: HistoryRow) -> bool:
-    return _same_school_cat(dl, h) and _core_compatible(
-        dl.get("core", ""), h.get("core", "")
-    )
-
-
 def build_batches(
     unmatched: Iterable[DaglubenRow],
     history: Iterable[HistoryRow],
     batch_size: int = 20,
 ) -> list[Batch]:
-    """Group unmatched dagluben rows by school, attach same-school candidates
-    (core-name pre-filtered), and slice into batches of ``batch_size``.
+    """Group unmatched dagluben rows by school, attach **same-招生类别**
+    candidates (core-name pre-filtered), and slice into batches of ``batch_size``.
 
-    The candidate list is computed per **school group** (not per item): every
-    dagluben item in the same school group shares the same candidate pool,
-    because the pre-filter is keyed on ``(school, cat, core-compatibility)``
-    and a school's candidates are independent of which dagluben row we ask
-    about. Computing once per group keeps the prompt size bounded.
+    招生类别是硬身份：只挂同类别候选；同类别无候选的 item 不进 batch，留给下游
+    「未能匹配」估算（past=1 跨类由 Stage 1.5 step3 一对多兜底，到不了这里）。
+
+    The candidate list is computed per item from the ``(school, cat)`` bucket:
+    every dagluben item gets the same-school **same-cat** history rows whose
+    core name is core-compatible (基础专业名 pre-filter).
 
     Output preserves input dagluben order. ``batch_size`` <= 0 is treated as
     a single batch.
@@ -167,36 +162,28 @@ def build_batches(
     if batch_size <= 0:
         batch_size = len(unmatched_list)
 
-    # Bucket history by (school, cat) AND by school-only (for 跨类别回退).
+    # Bucket history by (school, cat) only. 招生类别是硬身份：同类别无候选时不再
+    # 跨类回退（1.6.x 曾回退→高校专项被配到普通批；1.7.0 去掉）——该 item 不进
+    # agent batch，留给下游「未能匹配」+ 同校同选科均值估算。past=1 跨类（往年同校
+    # 该核心只 1 条、不同身份）由 Stage 1.5 step3 一对多兜底处理，到不了这里；到
+    # 这里的都是「同类别 2+ 候选」交 agent 判。
     by_school_cat: dict[tuple[str, str], list[HistoryRow]] = {}
-    by_school: dict[str, list[HistoryRow]] = {}
     for h in history_list:
         by_school_cat.setdefault(
             (h.get("school", ""), normalise_cat(h.get("school_cat", ""))), []
         ).append(h)
-        by_school.setdefault(h.get("school", ""), []).append(h)
 
     items: list[BatchItem] = []
     for d in unmatched_list:
         dl_core = d.get("core", "")
-        # 同类别同核心；为空则跨类别回退（同校任意类别）——与 Stage 1.5 一致，
-        # 让多候选跨类别 item（如今年普通、往年有中外合作+师范）也能被 agent 判。
-        same_cat = [
+        candidates = [
             h
             for h in by_school_cat.get(
                 (d.get("school", ""), normalise_cat(d.get("school_cat", ""))), []
             )
             if _core_compatible(dl_core, h.get("core", ""))
         ]
-        if same_cat:
-            candidates = same_cat
-        else:
-            candidates = [
-                h
-                for h in by_school.get(d.get("school", ""), [])
-                if _core_compatible(dl_core, h.get("core", ""))
-            ]
-        # 0 候选（同校真没有同核心）→ 不进 agent batch，直接走估算（identify_new_majors）。
+        # 同类别无候选 → 不跨类回退 → 不进 batch，下游走「未能匹配」估算。
         if not candidates:
             continue
         items.append(BatchItem(dagluben=d, candidates=candidates))

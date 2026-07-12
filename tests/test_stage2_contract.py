@@ -130,10 +130,10 @@ def test_accept_null_match(tmp_path: Path) -> None:
     assert results[0]["matched"] is False
 
 
-def test_apply_locates_cross_category_history_row(tmp_path: Path) -> None:
-    """§3 (fresh-test 2026-07-10)：省属公费生 history school_cat 空、大绿本显式类别。
-    _candidate_set 跨类别回退让 agent 选了它；_find_matched 必须镜像 _candidate_set
-    也能定位，否则 apply 报「通过候选集但无法定位历史行」崩溃（实测 478 条）。"""
+def test_apply_locates_gongfei_same_cat_history_row(tmp_path: Path) -> None:
+    """§3 公费生（1.7.0 改）：往年把身份写在专业名里，stage0 用 infer_cat_from_major
+    把它补进 school_cat（='省属公费农科生'）。大绿本同身份 → **同招生类别**匹配、
+    _find_matched 同类别定位——不再靠跨类回退（1.7.0 已删，避免高校专项被配普通批）。"""
     dagluben = [
         DaglubenRow(
             src_row_idx=1,
@@ -147,10 +147,10 @@ def test_apply_locates_cross_category_history_row(tmp_path: Path) -> None:
         )
     ]
     history = [
-        HistoryRow(  # history school_cat 空（类别只在专业名里，近三年表的常态）
+        HistoryRow(  # stage0 已从专业名把 省属公费农科生 补进 school_cat
             school="青岛农业大学",
-            school_cat="",
-            major="动物科学",
+            school_cat="省属公费农科生",
+            major="动物科学(省属公费农科生,面向济南市就业)",
             stripped="动物科学",
             core="动物科学",
             subject="物理",
@@ -167,10 +167,10 @@ def test_apply_locates_cross_category_history_row(tmp_path: Path) -> None:
                     "src_row_idx": 1,
                     "school": "青岛农业大学",
                     "major": "动物科学(省属公费农科生,面向济南市就业)",
-                    "match": "动物科学",
+                    "match": "动物科学(省属公费农科生,面向济南市就业)",
                     "J": 120.0,
                     "T": 3.0,
-                    "reason": "公费农科一对多",
+                    "reason": "公费农科同身份",
                 },
                 ensure_ascii=False,
             )

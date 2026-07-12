@@ -378,6 +378,35 @@ def test_match_coarse_different_category_never_matches():
     assert len(still) == 1
 
 
+def test_match_coarse_cross_cat_past1_detailed_note_and_marker():
+    """past=1 跨招生类别兜底：往年该身份只 1 条、今年是另一身份→仍配（一对多
+    兜底，past=1 绝对吸收）；reason 必须带可提取标记【跨招生类别·一对多兜底】
+    且写清前因后果（往年身份 / 今年身份 / 仅作参考），方便未来一刀切改全估算。"""
+    history = [
+        _hist(school="S大学", school_cat="普通计划", major="英语", core="英语", J=80.0),
+    ]
+    dagluben = [
+        _dl(
+            school="S大学",
+            school_cat="高校专项计划",
+            major="英语",
+            core="英语",
+            src_row_idx=5,
+        ),
+    ]
+    core_idx = stage1_5_coarse.build_core_idx(history)
+    school_idx = stage1_5_coarse.build_core_school_idx(history)
+    accepted, still = stage1_5_coarse.match_coarse(dagluben, core_idx, school_idx)
+    assert len(accepted) == 1
+    assert accepted[0]["src_row_idx"] == 5
+    assert accepted[0]["J"] == 80.0
+    log = accepted[0]["log"]
+    assert "跨招生类别·一对多兜底" in log  # 可提取标记
+    # 前因后果：两个身份都点名
+    assert "普通计划" in log and "高校专项计划" in log
+    assert len(still) == 0
+
+
 # --- combined Stage1 + Stage1.5 ordering (RED) ------------------------------
 
 

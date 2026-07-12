@@ -46,7 +46,13 @@ from scripts.constants import (
 )
 from scripts.line_diff import compute as compute_line_diff
 from scripts.models import DaglubenRow, HistoryRow
-from scripts.normalize import core_of, nfk, split_school, strip_ignore_brackets
+from scripts.normalize import (
+    core_of,
+    infer_cat_from_major,
+    nfk,
+    split_school,
+    strip_ignore_brackets,
+)
 
 __all__ = [
     "build_history_regular",
@@ -120,6 +126,11 @@ def build_history_regular(rows: Iterable[Sequence]) -> list[HistoryRow]:
         school, school_cat = split_school(school_raw)
         major_raw = _cell(row, J3_MAJORNAME) or ""
         major = nfk(major_raw)
+        # 往年把身份写在专业名里（公费师范生/地方专项/综合评价/中外合作…）、校名
+        # 里没有 → split_school 给空。从专业名补全 school_cat，让同身份匹配成立
+        # （否则公费生会因 school_cat 空而配不上、被错丢去估算）。
+        if not school_cat:
+            school_cat = infer_cat_from_major(major)
         stripped = strip_ignore_brackets(major_raw)
         core = nfk(core_of(major_raw))
         subject = nfk(_cell(row, J3_SUBJECT) or "")

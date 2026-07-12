@@ -121,3 +121,14 @@ def test_diff_brackets_tags_cooperation():
 
 def test_diff_brackets_no_brackets_returns_empty_list():
     assert normalize.diff_brackets("英语") == []
+
+
+def test_infer_cat_from_major_finds_gongfei_and_special_tracks():
+    """往年把招生类别塞在专业名里（校名没有）→ 从专业名认出来补 school_cat。
+    公费师范生/医/农、地方专项、综合评价、中外合作 都要认得出；普通专业认不出。"""
+    assert normalize.infer_cat_from_major("地理科学(省属公费师范生,面向临沂市就业)") == "省属公费师范生"
+    assert normalize.infer_cat_from_major("临床医学(省属公费医学生,面向菏泽市就业)") == "省属公费医学生"
+    assert normalize.infer_cat_from_major("金融学(地方专项计划)") == "地方专项计划"
+    assert normalize.infer_cat_from_major("通信工程(中外合作办学)") == "中外合作办学"
+    assert normalize.infer_cat_from_major("数学") == ""
+    assert normalize.infer_cat_from_major("数学(拔尖班)") == ""

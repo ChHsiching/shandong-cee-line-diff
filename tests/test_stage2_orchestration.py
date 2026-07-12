@@ -139,6 +139,47 @@ def test_build_batches_skips_zero_candidate_items() -> None:
     assert batches == []  # 0 候选 → 不进 batch
 
 
+def test_build_batches_no_cross_cat_fallback() -> None:
+    """招生类别是硬身份：同类别无候选时不再跨类回退捞候选。
+
+    1.6.x 曾回退（同类别空→退到同校任意类别），导致高校专项被配到普通批；
+    1.7.0 去掉——该 item 不进 agent batch，留给下游「未能匹配」+ 同校同选科
+    均值估算。past=1 跨类由 Stage 1.5 step3 一对多兜底（不在 stage2）。
+    """
+    # 今年高校专项英语；往年只有普通批英语（不同招生类别）。
+    unmatched = [_dl("S大学", "英语", "英语", 1, cat="高校专项计划")]
+    history = [_hist("S大学", "英语", "英语", 80.0, cat="普通计划")]
+    assert build_batches(unmatched, history, batch_size=20) == []
+
+
+def test_build_batches_gongfei_cat_inferred_from_major_not_dropped() -> None:
+    """公费生修复（1.7.0）：往年把身份写在专业名里（校名没有）→ split_school 给
+    school_cat 空。stage0 用 infer_cat_from_major 从专业名补全，于是大绿本公费
+    生（cat=省属公费师范生）能找到同身份候选、正常配——不被错丢去估算。
+    """
+    # 往年：身份"省属公费师范生"在专业名里、校名没有 → history school_cat 应被补全
+    history = [
+        _hist(
+            "S大学",
+            "地理科学(省属公费师范生,面向临沂市就业)",
+            "地理科学",
+            154.0,
+            cat="",  # 模拟 split_school 给空 → stage0 应已用专业名补成 省属公费师范生
+        ),
+    ]
+    # 这里直接验 build_batches 行为：大绿本公费生 cat=省属公费师范生，
+    # 往年那条（手动设成同 cat）应被当同类别候选。
+    history_filled = [
+        {**h, "school_cat": "省属公费师范生"} for h in history
+    ]
+    unmatched = [
+        _dl("S大学", "地理科学(省属公费师范生,面向临沂市就业)", "地理科学", 1, cat="省属公费师范生"),
+    ]
+    batches = build_batches(unmatched, history_filled, batch_size=20)
+    assert len(batches) == 1
+    assert len(batches[0].items[0].candidates) == 1
+
+
 # ---------------------------------------------------------------------------
 # write_prompts
 # ---------------------------------------------------------------------------
@@ -231,6 +272,20 @@ def test_matching_rule_allows_specific_vs_dalei(tmp_path: Path) -> None:
 
     assert "X↔X类" in MATCHING_RULE or ("X类" in MATCHING_RULE and "大类" in MATCHING_RULE)
     assert "经济学" in MATCHING_RULE  # 具体例子
+
+
+def test_matching_rule_identity_is_data_driven_not_label() -> None:
+    """1.7.0：身份由数据定、不靠标签——往年这校这核心有几条记录就是几个单独
+    招生的专业。培养标签班(拔尖/卓越/试验班) 在 past>1 时是不同专业（学校分线
+    招了），不能再像 1.6.x 那样自动合并到 plain。drift guard。
+    """
+    from scripts.stage2_agent import MATCHING_RULE
+
+    # 数据驱动判据必须在
+    assert "单独招生" in MATCHING_RULE or "几条记录" in MATCHING_RULE
+    # 培养标签班现在是 past>1 的身份区分标志（不再是「永远不算身份」）
+    assert "拔尖" in MATCHING_RULE and "卓越" in MATCHING_RULE
+    assert "永远不算身份" not in MATCHING_RULE
 
 
 # ---------------------------------------------------------------------------
